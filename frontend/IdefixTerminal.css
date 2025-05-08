@@ -1,0 +1,25 @@
+.xterm-viewport {
+  scrollbar-width: none;
+}
+
+.xterm-viewport::-webkit-scrollbar {
+  width: 3px;
+}
+
+.xterm-viewport:hover {
+  scrollbar-width: thin;
+  scrollbar-color: #4d595d #2f3a3e;
+}
+
+.xterm-viewport:hover::-webkit-scrollbar {
+  width: 3px;
+}
+
+.xterm-viewport:hover::-webkit-scrollbar-thumb {
+  background: #4d595d;
+  border-radius: 3px;
+}
+
+.xterm-screen {
+  margin: 4px;
+}

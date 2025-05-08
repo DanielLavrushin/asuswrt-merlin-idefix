@@ -27,7 +27,7 @@ func main() {
 	mux.Handle("/", http.FileServer(http.Dir("./public"))) // optional UI
 
 	addr := ":" + strconv.Itoa(port)
-	fmt.Printf("⚡  WebSocket PTY listening on %s/ws\n", addr)
+	fmt.Printf("⚡ WebSocket PTY listening on %s/ws\n", addr)
 
 	if err := http.ListenAndServe(addr, mux); err != nil && err != http.ErrServerClosed {
 		panic(err)

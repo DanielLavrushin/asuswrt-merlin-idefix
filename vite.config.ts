@@ -56,6 +56,7 @@ export default defineConfig(({ mode }) => {
   const __dirname = dirname(fileURLToPath(import.meta.url));
 
   const isProduction = mode === "production";
+  const watching = process.env.VITE_WATCH === "1";
   console.log(`Building for ${isProduction ? "production" : "development"}...`);
 
   return {
@@ -71,6 +72,13 @@ export default defineConfig(({ mode }) => {
 
           const backendDir = resolve(__dirname, "backend", "scripts");
           watchAllShFiles(this, backendDir);
+        },
+        generateBundle(_, bundle) {
+          for (const file of Object.values(bundle)) {
+            if (file.type === "chunk") {
+              file.code = file.code.replace(/<%/g, "<\\u0025");
+            }
+          }
         },
         name: "copy-and-sync",
         closeBundle: () => {
@@ -122,11 +130,10 @@ export default defineConfig(({ mode }) => {
           entryFileNames: "app.js",
         },
       },
-      emptyOutDir: true,
-    },
-    watch: process.env.VITE_WATCH ? {} : undefined,
-    server: {
-      hmr: false,
+      emptyOutDir: !watching,
+      sourcemap: false,
+      minify: true, //watching ? false : "esbuild",
+      watch: watching ? {} : null,
     },
   };
 });

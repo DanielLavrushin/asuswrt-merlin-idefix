@@ -2,7 +2,7 @@
 # shellcheck disable=SC2034  # codacy:Unused variables
 
 mount_ui() {
-
+    check_lock
     nvram get rc_support | grep -q am_addons
     if [ $? != 0 ]; then
         log_error "This firmware does not support addons!"
@@ -41,11 +41,13 @@ mount_ui() {
     ln -s -f "$ADDON_SHARE_DIR/index.asp" "/www/user/$ADDON_USER_PAGE"
     ln -s -f "$ADDON_SHARE_DIR/app.js" $ADDON_WEB_DIR/app.js || log_error "Failed to create symlink for app.js."
 
+    clear_lock
     log_ok "$ADDON_TITLE mounted successfully as $ADDON_USER_PAGE"
 }
 
 unmount_ui() {
 
+    check_lock
     nvram get rc_support | grep -q am_addons
     if [ $? != 0 ]; then
         log_error "This firmware does not support addons!"
@@ -78,6 +80,7 @@ unmount_ui() {
 
     rm -rf "/opt/bin/$ADDON_TAG" || log_error "Failed to remove symlink for $ADDON_TAG."
 
+    clear_lock
     log_ok "Unmount completed."
 }
 

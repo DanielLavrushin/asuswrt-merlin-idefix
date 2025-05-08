@@ -1,0 +1,8 @@
+#root {
+  width: 760px;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: #4d595d;
+  position: relative;
+}

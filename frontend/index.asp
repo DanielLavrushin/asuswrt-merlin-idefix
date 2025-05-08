@@ -14,41 +14,13 @@
     <link rel="stylesheet" type="text/css" href="form_style.css" />
     <link rel="stylesheet" type="text/css" href="/js/table/table.css" />
 
-    <script
-      language="JavaScript"
-      type="text/javascript"
-      src="/js/jquery.js"
-    ></script>
-    <script
-      language="JavaScript"
-      type="text/javascript"
-      src="/js/httpApi.js"
-    ></script>
-    <script
-      language="JavaScript"
-      type="text/javascript"
-      src="/state.js"
-    ></script>
-    <script
-      language="JavaScript"
-      type="text/javascript"
-      src="/general.js"
-    ></script>
-    <script
-      language="JavaScript"
-      type="text/javascript"
-      src="/popup.js"
-    ></script>
-    <script
-      language="JavaScript"
-      type="text/javascript"
-      src="/help.js"
-    ></script>
-    <script
-      language="JavaScript"
-      type="text/javascript"
-      src="/validator.js"
-    ></script>
+    <script language="JavaScript" type="text/javascript" src="/js/jquery.js"></script>
+    <script language="JavaScript" type="text/javascript" src="/js/httpApi.js"></script>
+    <script language="JavaScript" type="text/javascript" src="/state.js"></script>
+    <script language="JavaScript" type="text/javascript" src="/general.js"></script>
+    <script language="JavaScript" type="text/javascript" src="/popup.js"></script>
+    <script language="JavaScript" type="text/javascript" src="/help.js"></script>
+    <script language="JavaScript" type="text/javascript" src="/validator.js"></script>
     <script type="module" crossorigin src="/user/idefix/app.js"></script>
   </head>
 
@@ -65,39 +37,7 @@
           </td>
           <td valign="top">
             <div id="tabMenu" class="submenuBlock"></div>
-            <table
-              width="98%"
-              border="0"
-              align="left"
-              cellpadding="0"
-              cellspacing="0"
-            >
-              <tbody>
-                <tr>
-                  <td valign="top">
-                    <table
-                      width="760px"
-                      border="0"
-                      cellpadding="4"
-                      cellspacing="0"
-                      id="FormTitle"
-                      class="FormTitle"
-                    >
-                      <tbody>
-                        <tr bgcolor="#4D595D">
-                          <td valign="top">
-                            <div class="formfontdesc">
-                              <div>&nbsp;</div>
-                              <div id="root"></div>
-                            </div>
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+            <div id="root"></div>
           </td>
         </tr>
       </tbody>
@@ -105,8 +45,16 @@
     <div id="footer"></div>
 
     <script>
-      document.addEventListener("DOMContentLoaded", function () {
-        if (typeof window.show_menu === "function") {
+      const custom_settings_raw = '<% get_custom_settings(); %>';
+      const stripAnsi = /\u001b\[[0-9;]*m/g;
+      const stripControls = /[\u0000-\u001F]+/g;
+      const custom_settings = JSON.parse(custom_settings_raw.replace(stripAnsi, '').replace(stripControls, ''));
+
+      var idefix = {
+        custom_setings: custom_settings
+      };
+      document.addEventListener('DOMContentLoaded', function () {
+        if (typeof window.show_menu === 'function') {
           window.show_menu();
         }
       });
