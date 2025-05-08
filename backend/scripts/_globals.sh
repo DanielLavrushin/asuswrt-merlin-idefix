@@ -2,6 +2,10 @@
 # shellcheck disable=SC2034  # codacy:Unused variables
 
 export PATH="/opt/bin:/opt/sbin:/sbin:/bin:/usr/sbin:/usr/bin"
+export HOME="/tmp/home/root"
+export USER="root"
+export SHELL="/bin/sh"
+export TERM="xterm-256color"
 
 source /usr/sbin/helper.sh
 

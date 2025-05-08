@@ -3,14 +3,18 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"strconv"
+	"time"
 
 	"github.com/coder/websocket"
 	"github.com/creack/pty"
@@ -35,6 +39,14 @@ func main() {
 }
 
 func wsHandler(w http.ResponseWriter, r *http.Request) {
+
+	if !authorised(r) {
+		fmt.Println("Unauthorized access")
+		w.Header().Set("WWW-Authenticate", `Basic realm="Restricted"`)
+		w.WriteHeader(401)
+		return
+	}
+
 	c, err := websocket.Accept(w, r, &websocket.AcceptOptions{
 		Subprotocols:       []string{"idefix"},
 		CompressionMode:    websocket.CompressionContextTakeover,
@@ -93,6 +105,69 @@ func startShell(cols, rows int) (ptmx *os.File, cmd *exec.Cmd, err error) {
 
 func resizePTY(f *os.File, cols, rows int) {
 	pty.Setsize(f, &pty.Winsize{Cols: uint16(cols), Rows: uint16(rows)})
+}
+
+func authorised(r *http.Request) bool {
+	tok, _ := r.Cookie("asus_token")
+	fmt.Println("Token:", tok)
+
+	if tok == nil {
+		return false
+	}
+	if tok.Value == "" {
+		return false
+	}
+	if tokenValid(tok.Value) {
+		return true
+	}
+	return false
+}
+
+var routerIP = "192.168.1.1"
+
+func tokenValid(token string) bool {
+	u := url.URL{Scheme: "http", Host: net.JoinHostPort("127.0.0.1", "80"),
+		Path: "/ajax_status.xml"}
+
+	if httpsOnly() {
+		u.Scheme = "https"
+		u.Host = net.JoinHostPort("127.0.0.1", "443")
+	}
+
+	req, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		return false
+	}
+
+	req.Header.Set("Cookie", "asus_token="+token)
+	req.Host = routerIP
+
+	cli := http.DefaultClient
+	if u.Scheme == "https" {
+		cli = &http.Client{
+			Timeout: 2 * time.Second,
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			},
+		}
+	}
+
+	resp, err := cli.Do(req)
+	if err != nil {
+		return false
+	}
+	resp.Body.Close()
+	return resp.StatusCode == http.StatusOK
+}
+
+func httpsOnly() bool {
+	// quick probe – open port 80; if closed, assume HTTPS-only
+	c, err := net.DialTimeout("tcp", "127.0.0.1:80", time.Second)
+	if err != nil {
+		return true
+	}
+	c.Close()
+	return false
 }
 
 type wsWriter struct{ *websocket.Conn }
