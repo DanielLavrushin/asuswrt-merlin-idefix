@@ -1,0 +1,8 @@
+{
+  "explorer.fileNesting.enabled": true,
+  "explorer.fileNesting.patterns": {
+    "*.tsx": "${capture}.*",
+    "Dockerfile": "Dockerfile.*",
+    "electron.bootstrap.js": "electron${capture}.*"
+  }
+}

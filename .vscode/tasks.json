@@ -1,0 +1,17 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "ACIW: Watch Main",
+      "type": "shell",
+      "command": "source ~/.nvm/nvm.sh && npm run copy:ansible && npm run build:main",
+      "options": {
+        "cwd": "${workspaceFolder}/frontends/installation-wizard-nxt",
+        "env": {
+          "PATH": "/usr/local/bin:/usr/bin:/bin:${env:PATH}"
+        }
+      },
+      "problemMatcher": []
+    }
+  ]
+}

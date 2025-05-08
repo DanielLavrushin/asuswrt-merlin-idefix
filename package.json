@@ -1,0 +1,43 @@
+{
+  "name": "asuswrt-merlin-idefix",
+  "version": "1.0.0",
+  "description": "",
+  "main": "frontend/index.tsx",
+  "scripts": {
+    "dev": "vite",
+    "build:react": "vite build",
+    "watch": "cross-env NODE_ENV=development VITE_WATCH=1 vite build --watch --mode development"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DanielLavrushin/asuswrt-merlin-idefix.git"
+  },
+  "author": "Daniel Lavrushin",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/DanielLavrushin/asuswrt-merlin-idefix/issues"
+  },
+  "homepage": "https://github.com/DanielLavrushin/asuswrt-merlin-idefix#readme",
+  "devDependencies": {
+    "@types/node": "^22.15.16",
+    "@types/xterm": "^2.0.3",
+    "@vitejs/plugin-react": "^4.4.1",
+    "cross-env": "^7.0.3",
+    "dotenv": "^16.5.0",
+    "ssh2-sftp-client": "^12.0.0",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.5",
+    "vite-plugin-css-injected-by-js": "^3.5.2",
+    "vite-plugin-svgr": "^4.3.0"
+  },
+  "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.0",
+    "@mui/material": "^7.1.0",
+    "@xterm/addon-attach": "^0.11.0",
+    "@xterm/addon-fit": "^0.10.0",
+    "@xterm/xterm": "^5.5.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  }
+}

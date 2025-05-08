@@ -1,0 +1,16 @@
+# Root & temp
+root = "."
+tmp_dir = "tmp"
+
+# Build & run commands
+build_cmd = "go build -o {{.TmpDir}}/idefix-server ./..."
+run_cmd = "{{.TmpDir}}/idefix-server -port 8787"
+
+# Watching rules
+exclude_dir = ["dist", "tmp", ".git"]
+exclude_file = ["*_test.go"]
+include_ext = ["go"]
+
+# Optional: colourize, debounce, etc.
+delay = 1000 # ms debounce; tweak to taste
+log_color = "on"

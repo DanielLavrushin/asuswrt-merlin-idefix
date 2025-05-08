@@ -1,0 +1,12 @@
+﻿################################################################################
+# This .gitignore file was automatically created by Microsoft(R) Visual Studio.
+################################################################################
+
+/csharp/MIPAppCenter/.vs/MIPAppCenter
+.vs/
+go/go.work*
+go/go.work.sum
+dist/
+backend/tmp/
+node_modules/
+.env
