@@ -78,10 +78,10 @@ install() {
     local tmp_dir="/tmp/idefix"
     mkdir -p /jffs/share/idefix
 
-    mv "$tmp_dir/idefix/app.js" /jffs/share/idefix
-    mv "$tmp_dir/idefix/index.asp" /jffs/share/idefix
+    mv "$tmp_dir/app.js" /jffs/share/idefix
+    mv "$tmp_dir/index.asp" /jffs/share/idefix
 
-    mv "$tmp_dir/idefix/idefix-server" /jffs/scripts/idefix
+    mv "$tmp_dir/idefix-server" /jffs/scripts/idefix
 
     chmod 0755 /jffs/scripts/idefix-server
 
