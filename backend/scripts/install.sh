@@ -70,19 +70,17 @@ install() {
     # Add or update service-event
     setup_script_file "/jffs/scripts/service-event" "echo \"\$2\" | grep -q \"^idefix\" && /jffs/scripts/idefix service_event \$(echo \"\$2\" | cut -d'_' -f2- | tr '_' ' ') & #idefix"
 
-    generate_secret
-
     am_settings_set "idefix_version" "$ADDON_VERSION"
 
     local tmp_dir="/tmp/idefix"
-    mkdir -p /jffs/share/idefix
+    mkdir -p "$ADDON_SHARE_DIR"
 
-    mv "$tmp_dir/app.js" /jffs/share/idefix
-    mv "$tmp_dir/index.asp" /jffs/share/idefix
+    mv "$tmp_dir/app.js" "$ADDON_SHARE_DIR"
+    mv "$tmp_dir/index.asp" "$ADDON_SHARE_DIR"
 
-    mv "$tmp_dir/idefix-server" "$ADDON_SHARE_DIR/idefix-server"
+    mv "$tmp_dir/idefix-server" "$ADDON_SHARE_DIR"
 
-    chmod 0755 "$ADDON_SHARE_DIR/idefix-server"
+    chmod 0755 "$ADDON_SERVER"
 
     remount_ui
 
@@ -90,6 +88,7 @@ install() {
 
     rm -rf "$tmp_dir"
 
+    generate_secret
     firewall_add_rules
 
     log_box "$ADDON_TITLE $ADDON_VERSION installed successfully."

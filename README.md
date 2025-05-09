@@ -9,9 +9,7 @@
 
 ![image](https://github.com/user-attachments/assets/d535a0da-0d06-44a1-ba3a-7a7c21e84a72)
 
-
 A self-contained erminal that plugs straight into the *Merlin* Web UI.
-
 
 ## Quick install
 
@@ -29,6 +27,5 @@ wget -O /tmp/idefix-install.sh \
 ```bash
 idefix uninstall
 ```
-
 
 ![image](https://github.com/user-attachments/assets/36f13b3d-57c3-4a50-a8ce-4fccc3de6c3d)
