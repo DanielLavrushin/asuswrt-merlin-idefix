@@ -28,4 +28,6 @@ ADDON_SERVER_PORT=8787
 ADDON_TOKEN_FILE="/tmp/$ADDON_TAG.token"
 ADDON_SECRET_FILE=/jffs/addons/idefix/sec.key
 
+ADDON_RESPONSE_FILE="$ADDON_WEB_DIR/response.json"
+
 ADDON_DEBUG="false"

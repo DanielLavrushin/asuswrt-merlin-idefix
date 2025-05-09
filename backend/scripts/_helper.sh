@@ -210,13 +210,13 @@ cleanup_payload() {
 
 load_ui_response() {
 
-    if [ ! -f "$UI_RESPONSE_FILE" ]; then
-        log_ok "Creating $ADDON_TITLE response file: $UI_RESPONSE_FILE"
-        echo '{}' >"$UI_RESPONSE_FILE"
-        chmod 600 "$UI_RESPONSE_FILE"
+    if [ ! -f "$ADDON_RESPONSE_FILE" ]; then
+        log_ok "Creating $ADDON_TITLE response file: $ADDON_RESPONSE_FILE"
+        echo '{}' >"$ADDON_RESPONSE_FILE"
+        chmod 600 "$ADDON_RESPONSE_FILE"
     fi
 
-    UI_RESPONSE=$(cat "$UI_RESPONSE_FILE")
+    UI_RESPONSE=$(cat "$ADDON_RESPONSE_FILE")
     if [ "$UI_RESPONSE" = "" ]; then
         UI_RESPONSE="{}"
     fi
@@ -224,12 +224,72 @@ load_ui_response() {
 
 save_ui_response() {
 
-    log_debug "Saving UI response to $UI_RESPONSE_FILE"
+    log_debug "Saving UI response to $ADDON_RESPONSE_FILE"
 
-    if ! echo "$UI_RESPONSE" >"$UI_RESPONSE_FILE"; then
-        log_error "Failed to save UI response to $UI_RESPONSE_FILE"
+    if ! echo "$UI_RESPONSE" >"$ADDON_RESPONSE_FILE"; then
+        log_error "Failed to save UI response to $ADDON_RESPONSE_FILE"
         clear_lock
         return 1
     fi
 
+}
+
+update_loading_progress() {
+    local message=$1
+    local loginfo=${2:-false}
+    local progress=$3
+
+    if [ "$loginfo" = "true" ]; then
+        log_info "$message"
+    fi
+
+    if [ ! -d "$ADDON_WEB_DIR" ]; then
+        return
+    fi
+
+    load_ui_response
+
+    local json_content
+    if [ -f "$ADDON_RESPONSE_FILE" ]; then
+        json_content=$(cat "$ADDON_RESPONSE_FILE")
+    else
+        json_content="{}"
+    fi
+
+    if [ -n "$progress" ]; then
+        json_content=$(echo "$json_content" | jq --argjson progress "$progress" --arg message "$message" '
+            .loading.message = $message |
+            .loading.progress = $progress
+        ')
+    else
+        json_content=$(echo "$json_content" | jq --arg message "$message" '
+            .loading.message = $message
+        ')
+    fi
+
+    echo "$json_content" >"/tmp/idefix-response.tmp" && mv -f "/tmp/idefix-response.tmp" "$ADDON_RESPONSE_FILE"
+
+    if [ "$progress" = "100" ]; then
+        /jffs/scripts/idefix service_event loading clean >/dev/null 2>&1 &
+    fi
+
+}
+
+remove_loading_progress() {
+
+    log_info "Removing loading progress..."
+    if [ ! -d "$ADDON_WEB_DIR" ]; then
+        return
+    fi
+
+    sleep 1
+    load_ui_response
+
+    local json_content=$(cat "$ADDON_RESPONSE_FILE")
+
+    json_content=$(echo "$json_content" | jq '
+            del(.loading)
+        ')
+
+    echo "$json_content" >"/tmp/idefix-response.tmp" && mv -f "/tmp/idefix-response.tmp" "$ADDON_RESPONSE_FILE"
 }

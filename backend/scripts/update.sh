@@ -2,7 +2,9 @@
 # shellcheck disable=SC2034  # codacy:Unused variables
 
 update() {
-    log_info "Updating $ADDON_TITLE..."
+
+    update_loading_progress "Updating $ADDON_TITLE..." true
+
     local pid=$(get_proc "idefix-server")
 
     local specific_version=${1:-"latest"}
@@ -16,17 +18,17 @@ update() {
         local url="https://github.com/DanielLavrushin/asuswrt-merlin-idefix/releases/download/v$specific_version/asuswrt-merlin-idefix.tar.gz"
     fi
 
-    log_info "Downloading the version:$specific_version..."
+    update_loading_progress "Downloading the version:$specific_version..." true
     if wget -q --show-progress -O "$temp_file" "$url"; then
-        log_info "Download completed successfully."
+        log_ok "Download completed successfully."
     else
         log_error "Failed to download the $specific_version version. Exiting."
         return 1
     fi
 
-    log_info "Extracting the package..."
+    update_loading_progress "Extracting the package..." true
     if tar -xzf "$temp_file" -C "/tmp"; then
-        log_info "Extraction completed."
+        log_ok "Extraction completed."
     else
         log_error "Failed to extract the package. Exiting."
         return 1
@@ -34,7 +36,7 @@ update() {
 
     rm -f "$temp_file"
 
-    log_info "Setting up the script..."
+    update_loading_progress "Setting up the script..." true
     if mv "$temp_dir/idefix" "$ADDON_SCRIPT" && chmod 0755 "$ADDON_SCRIPT"; then
         log_ok "Script set up successfully."
     else
@@ -44,7 +46,7 @@ update() {
 
     update_server "$specific_version"
 
-    log_info "Running the installation..."
+    update_loading_progress "Running the installation..." true
     if sh "$ADDON_SCRIPT" install; then
         log_ok "Installation completed successfully."
     else

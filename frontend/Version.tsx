@@ -64,32 +64,29 @@ export default function VersionBadge() {
         }}
         onClick={() => setOpen(true)}
       >
-        {hasUpdate && <Chip label="!" color="info" size="small" sx={{ fontWeight: 700, p: 0, height: 18 }} />}
-        <span style={{ fontWeight: 500 }}>v{current}</span>
+        {hasUpdate && <Chip label="!" size="small" sx={{ fontWeight: 700, p: 0, height: 18, backgroundColor: '#fc0' }} />}
+        <span style={{ fontWeight: 500, color: '#fc0' }}>v{current}</span>
       </Box>
 
-      {/* ------ modal ------ */}
-      <Dialog open={open} maxWidth="sm" fullWidth onClose={() => setOpen(false)}>
-        <DialogTitle>New version available</DialogTitle>
-
-        <DialogContent dividers sx={{ typography: 'body2' }}>
+      <Dialog open={open} fullWidth onClose={() => setOpen(false)}>
+        <DialogTitle sx={{ bgcolor: '#2f3a3e', color: 'white' }}>{hasUpdate ? 'New version available!' : 'Version info'}</DialogTitle>
+        <DialogContent dividers sx={{ typography: 'body2', bgcolor: '#2f3a3e', color: 'white' }}>
           <Typography gutterBottom>
-            Current version:&nbsp;<strong>{current}</strong>
+            Current version: <strong>{current}</strong>
           </Typography>
 
           {latest ? (
             <>
               <Typography gutterBottom>
-                Latest version on GitHub:&nbsp;
-                <strong>{latest}</strong>
+                Latest version on GitHub: <strong>{latest}</strong>
               </Typography>
               <Box
                 sx={{
                   mt: 2,
                   p: 1,
-                  bgcolor: theme.palette.mode === 'dark' ? '#2f3a3e' : '#f5f5f5',
+
                   border: '1px solid',
-                  borderColor: theme.palette.mode === 'dark' ? '#222' : 'divider',
+                  color: 'white',
                   borderRadius: 1,
                   maxHeight: 240,
                   overflow: 'auto',
@@ -104,7 +101,7 @@ export default function VersionBadge() {
           )}
         </DialogContent>
 
-        <DialogActions>
+        <DialogActions sx={{ bgcolor: '#2f3a3e', color: 'white' }}>
           {hasUpdate ? (
             <>
               <Button onClick={handleSkip}>Skip&nbsp;v{latest}</Button>

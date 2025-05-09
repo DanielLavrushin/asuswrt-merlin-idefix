@@ -62,7 +62,7 @@ setup_script_file() {
 
 install() {
 
-    log_info "Installing $ADDON_TITLE $ADDON_VERSION..."
+    update_loading_progress "Installing $ADDON_TITLE $ADDON_VERSION..." true
 
     # Add or update post-mount
     setup_script_file "/jffs/scripts/post-mount" "/jffs/scripts/idefix startup & #idefix"
@@ -89,7 +89,11 @@ install() {
     rm -rf "$tmp_dir"
 
     generate_secret
+
+    update_loading_progress "Setting up the firewall..."
     firewall_add_rules
+
+    update_loading_progress "Installation completed successfully." false 100
 
     log_box "$ADDON_TITLE $ADDON_VERSION installed successfully."
 }

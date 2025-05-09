@@ -16,7 +16,7 @@ mount_ui() {
         exit 5
     fi
 
-    log_info "Mounting $ADDON_TITLE as $ADDON_USER_PAGE"
+    update_loading_progress "Mounting $ADDON_TITLE as $ADDON_USER_PAGE" true
 
     echo "$ADDON_TAG" >"/www/user/$(echo $ADDON_USER_PAGE | cut -f1 -d'.').title"
 
