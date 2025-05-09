@@ -25,7 +25,7 @@ update() {
     fi
 
     log_info "Extracting the package..."
-    if tar -xzf "$temp_file" -C "/tmp/idefix"; then
+    if tar -xzf "$temp_file" -C "/tmp"; then
         log_info "Extraction completed."
     else
         log_error "Failed to extract the package. Exiting."
@@ -63,6 +63,8 @@ update_server() {
     local specific_version=${1:-"latest"}
     local temp_file="/tmp/idefix-server.tar.gz"
     local temp_dir="/tmp/idefix"
+
+    mkdir -p "$temp_dir"
 
     local arch=$(uname -m)
     local asset_name=""
@@ -102,7 +104,7 @@ update_server() {
     fi
 
     log_info "Extracting the package..."
-    if tar -xzf "$temp_file" -C "$ADDON_SHARE_DIR"; then
+    if tar -xzf "$temp_file" -C "$temp_dir"; then
         log_info "Extraction completed."
     else
         log_error "Failed to extract the package. Exiting."
