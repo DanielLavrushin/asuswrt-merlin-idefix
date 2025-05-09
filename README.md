@@ -5,7 +5,7 @@
 ![GitHub Downloads (latest)](https://img.shields.io/github/downloads/daniellavrushin/asuswrt-merlin-idefix/latest/total)
 ![GitHub Downloads (total)](https://img.shields.io/github/downloads/DanielLavrushin/asuswrt-merlin-idefix/total?label=total%20downloads)
 
-# DEFIX Terminal for ASUSWRT-Merlin
+# IDEFIX Terminal for ASUSWRT-Merlin
 
 ![image](https://github.com/user-attachments/assets/d535a0da-0d06-44a1-ba3a-7a7c21e84a72)
 
