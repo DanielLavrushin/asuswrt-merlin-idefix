@@ -28,16 +28,10 @@ export const LoadingProvider = ({ children }: { children: ReactNode }) => {
     <Ctx.Provider value={api}>
       {children}
 
-      <Backdrop open={state.open} sx={{ zIndex: 1301, color: 'white', backdropFilter: 'blur(3px)' }}>
+      <Backdrop open={state.open} sx={{ zIndex: 9998, color: 'white', backdropFilter: 'blur(3px)' }}>
         <Fade in={state.open} timeout={300}>
           <Stack spacing={2} sx={{ minWidth: 240 }} alignItems="center">
-            {state.progress === undefined ? (
-              <CircularProgress size={48} thickness={4} />
-            ) : (
-              <>
-                <Typography variant="caption">{state.message}%</Typography>
-              </>
-            )}
+            <CircularProgress size={48} thickness={4} />
             {state.message && <Typography variant="caption">{state.message}</Typography>}
           </Stack>
         </Fade>

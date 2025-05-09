@@ -178,19 +178,25 @@ class Engine {
     });
 
     if (windowReload) {
-      setTimeout(() => window.location.reload(), 1_000);
+      setTimeout(() => window.location.reload(), 1000);
     }
   }
   async checkLoadingProgress(opts: { onUpdate: (msg?: string, progress?: number) => void; onDone: () => void }): Promise<void> {
     const timer = setInterval(async () => {
       const r = await this.getResponse();
+
       if (r.loading) {
         opts.onUpdate(r.loading.message, r.loading.progress);
+
+        if (typeof r.loading.progress === 'number' && r.loading.progress >= 100) {
+          clearInterval(timer);
+          opts.onDone();
+        }
       } else {
         clearInterval(timer);
         opts.onDone();
       }
-    }, 1000);
+    }, 300);
   }
 }
 
