@@ -1,0 +1,93 @@
+name: Manual Build and Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version'
+        required: true
+        default: '1.0.0'
+      draft:
+        description: 'Save the release as a draft first?'
+        required: false
+        default: false
+        type: boolean
+
+      prerelease:
+        description: 'Mark this build as a pre-release?'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Install  dependencies
+        run: npm install
+
+      - name: Build
+        run: npm run build
+
+      - name: Update XRAYUI Version
+        env:
+          ADDON_VERSION: ${{ github.event.inputs.version }}
+        run: |
+          echo "Updating ADDON_VERSION to $ADDON_VERSION in /dist/idefix"
+          sed -i "s/^ADDON_VERSION=.*/ADDON_VERSION=\"$ADDON_VERSION\"/" dist/idefix
+
+      - name: Archive  dist
+        run: tar --transform 's|^|idefix/|' -czf asuswrt-merlin-xrayui.tar.gz -C dist .
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+
+      - name: Build idefix-server
+        run: |
+          cd backend
+          make all
+
+      - name: Create archives
+        run: |
+          cd dist/server
+          tar -czf idefix-server-amd64.tar.gz -C amd64 .
+          tar -czf idefix-server-arm.tar.gz   -C arm   .
+          tar -czf idefix-server-arm64.tar.gz -C arm64 .
+
+      - name: Read Changelog (Latest Version Only)
+        id: read_changelog
+        run: |
+          echo "Extracting latest changelog entry..."
+          CHANGELOG=$(awk '/^## \[/{if (found++) exit} found {print}' CHANGELOG.md)
+          echo "changelog<<EOF" >> $GITHUB_ENV
+          echo "$CHANGELOG" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+
+      - name: Create GitHub Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ github.event.inputs.version }}
+          release_name: 'Release ${{ github.event.inputs.version }}'
+          draft: ${{ github.event.inputs.draft == 'true' }}
+          prerelease: ${{ github.event.inputs.prerelease == 'true' }}
+          body: ${{ env.changelog }}
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            asuswrt-merlin-idefix.tar.gz
+            dist/server/idefix-server-amd64.tar.gz
+            dist/server/idefix-server-arm.tar.gz
+            dist/server/idefix-server-arm64.tar.gz

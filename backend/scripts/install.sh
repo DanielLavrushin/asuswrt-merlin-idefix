@@ -1,3 +1,6 @@
+#!/bin/sh
+# shellcheck disable=SC2034  # codacy:Unused variables
+
 clear_script_entries() {
 
     log_info "Removing existing $ADDON_TITLE entries from scripts."
@@ -65,10 +68,21 @@ install() {
     # Add or update service-event
     setup_script_file "/jffs/scripts/service-event" "echo \"\$2\" | grep -q \"^idefix\" && /jffs/scripts/idefix service_event \$(echo \"\$2\" | cut -d'_' -f2- | tr '_' ' ') & #idefix"
 
+    generate_secret
+    firewall_add_rules
     remount_ui
+
+    am_settings_set "idefix_version" "$ADDON_VERSION"
+
+    log_box "$ADDON_TITLE $ADDON_VERSION installed successfully."
 }
 
 uninstall() {
     clear_script_entries
     unmount_ui
+    firewall_clear_rules
+
+    am_settings_del "idefix"
+
+    log_box "$ADDON_TITLE $ADDON_VERSION uninstalled successfully."
 }

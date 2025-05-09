@@ -23,4 +23,9 @@ ADDON_LOGS_DIR="$ADDON_SHARE_DIR/logs"
 
 ADDON_SERVER="$ADDON_SHARE_DIR/idefix-server"
 
+ADDON_SERVER_PORT=8787
+
+ADDON_TOKEN_FILE="/tmp/$ADDON_TAG.token"
+ADDON_SECRET_FILE=/jffs/addons/idefix/sec.key
+
 ADDON_DEBUG="true"

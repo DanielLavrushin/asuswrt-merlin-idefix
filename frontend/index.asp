@@ -51,8 +51,10 @@
       const custom_settings = JSON.parse(custom_settings_raw.replace(stripAnsi, '').replace(stripControls, ''));
 
       var idefix = {
-        custom_setings: custom_settings
+        custom_settings
       };
+      window.showLoading = function () {};
+      window.hideLoading = function () {};
       document.addEventListener('DOMContentLoaded', function () {
         if (typeof window.show_menu === 'function') {
           window.show_menu();

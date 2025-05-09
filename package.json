@@ -5,7 +5,7 @@
   "main": "frontend/index.tsx",
   "scripts": {
     "dev": "vite",
-    "build:react": "vite build",
+    "build": "cross-env NODE_ENV=production vite build --mode production",
     "watch": "cross-env NODE_ENV=development VITE_WATCH=1 vite build --watch --mode development"
   },
   "repository": {
@@ -38,7 +38,10 @@
     "@xterm/addon-fit": "^0.10.0",
     "@xterm/xterm": "^5.5.0",
     "axios": "^1.9.0",
+    "marked": "^15.0.11",
     "react": "^19.1.0",
-    "react-dom": "^19.1.0"
+    "react-dom": "^19.1.0",
+    "version-clean": "^1.9.0",
+    "version-compare": "^3.11.0"
   }
 }

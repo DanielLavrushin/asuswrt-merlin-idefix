@@ -1,6 +1,18 @@
+
 BINARY_NAME=idefix-server
 OUTPUT_DIR=./../dist/server
 SRC=main.go
+
+
+GOBIN := $(shell go env GOBIN)
+ifeq ($(strip $(GOBIN)),)
+GOBIN := $(shell go env GOPATH)/bin
+endif
+AIR := $(GOBIN)/air
+
+$(AIR):
+	@echo "→ installing Air …"
+	go install github.com/cosmtrek/air@latest
 
 all: build_arm build_arm64 build_linux
 
@@ -16,11 +28,11 @@ build_linux:
 
 .PHONY: dev
 dev:                                       
-	@command -v air >/dev/null 2>&1 || { \
+	@command -v $(AIR) >/dev/null 2>&1 || { \
 		echo '→ installing Air …'; \
 		go install github.com/air-verse/air@latest; \
 	}
-	air -c .air.toml
+	$(AIR) -c .air.toml
 
 clean:
 	rm -f $(BINARY_NAME)_*

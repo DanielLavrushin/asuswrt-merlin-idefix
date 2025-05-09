@@ -88,7 +88,7 @@ export default defineConfig(({ mode }) => {
             const scriptPath = join(__dirname, 'backend', 'scripts', 'idefix.sh');
             const mergedContent = inlineShellImports(scriptPath);
 
-            const distScript = join(__dirname, 'dist', 'idefix.sh');
+            const distScript = join(__dirname, 'dist', 'idefix');
             fs.writeFileSync(distScript, mergedContent, { mode: 0o755 });
 
             fs.copyFileSync('frontend/index.asp', 'dist/index.asp');

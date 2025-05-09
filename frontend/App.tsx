@@ -1,41 +1,50 @@
-import { Box, CssBaseline, Typography } from '@mui/material';
-import React from 'react';
-import { useEffect } from 'react';
+import { AppBar, Box, Chip, ChipProps, Typography } from '@mui/material';
+import React, { useState } from 'react';
 import IdefixTerminal from './IdefixTerminal';
 import './App.css';
 import idefixBg from './assets/idefix.png?inline';
-
+import Version from './Version';
 function App() {
-  useEffect(() => {}, []);
+  const [status, setStatus] = useState<'connected' | 'reconnecting' | 'offline'>('offline');
+
+  const statusColor: ChipProps['color'] = {
+    connected: 'success',
+    reconnecting: 'warning',
+    offline: 'error'
+  }[status] as ChipProps['color'];
 
   return (
-    <Box
-      sx={{
-        height: '100%',
-        width: '100%',
-        display: 'flex',
-        flexDirection: 'column'
-      }}
-    >
-      <Typography variant="h5" sx={{ p: 2 }}>
-        Idefix Terminal
-      </Typography>
-      <IdefixTerminal />
+    <>
       <Box
-        component="img"
-        src={idefixBg}
-        alt=""
         sx={{
-          position: 'absolute',
-          bottom: 0,
-          left: 0,
-          width: 140,
-          pointerEvents: 'none',
-          userSelect: 'none',
-          opacity: 0.85
+          height: '100vh',
+          width: '100%',
+          display: 'flex',
+          flexDirection: 'column'
         }}
-      />
-    </Box>
+      >
+        <Typography variant="h5" sx={{ p: 2 }}>
+          Idefix Terminal
+        </Typography>
+        <IdefixTerminal onStatusChange={setStatus} />
+        <Box
+          component="img"
+          src={idefixBg}
+          alt=""
+          sx={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            width: 140,
+            pointerEvents: 'none',
+            userSelect: 'none',
+            opacity: 0.85
+          }}
+        />
+        <Version />
+        {/* <Chip color={statusColor} size="small" label={status} sx={{ textTransform: 'capitalize', top: 2, right: 0 }} /> */}
+      </Box>
+    </>
   );
 }
 

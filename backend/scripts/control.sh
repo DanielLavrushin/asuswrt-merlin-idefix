@@ -1,3 +1,6 @@
+#!/bin/sh
+# shellcheck disable=SC2034  # codacy:Unused variables
+
 start() {
     log_info "Starting $ADDON_TITLE..."
     local pid=$(get_proc "idefix-server")
@@ -11,6 +14,7 @@ start() {
     local pid=$!
     echo $pid >/var/run/$ADDON_TAG.pid
 
+    firewall_add_rules
     log_ok "$ADDON_TITLE started with PID: $pid"
 }
 
@@ -25,6 +29,7 @@ stop() {
     killall idefix-server 2>/dev/null && log_ok "$ADDON_TITLE stopped." || log_error "$ADDON_TITLE failed to stop."
     rm -f /var/run/$ADDON_TAG.pid
 
+    firewall_clear_rules
 }
 
 restart() {
@@ -37,6 +42,8 @@ restart() {
 startup() {
     log_info "Starting $ADDON_TITLE on startup..."
 
+    firewall_add_rules
+    generate_secret
     remount_ui
 
     log_ok "$ADDON_TITLE started with PID: $pid"

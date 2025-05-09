@@ -7,6 +7,8 @@ import ./mount.sh
 import ./control.sh
 import ./install.sh
 import ./lock.sh
+import ./token.sh
+import ./firewall.sh
 
 case "$1" in
 mount_ui)
@@ -49,6 +51,13 @@ service_event)
         ;;
     restart)
         restart
+        ;;
+    generate)
+        case "$3" in
+        token)
+            generate_token "$4"
+            ;;
+        esac
         ;;
     *)
         log_error "Unknown service event: $2"

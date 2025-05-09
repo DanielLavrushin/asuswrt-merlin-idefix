@@ -2,15 +2,16 @@
 package main
 
 import (
+	"bytes"
 	"context"
-	"crypto/tls"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
-	"net/url"
 	"os"
 	"os/exec"
 	"strconv"
@@ -20,16 +21,26 @@ import (
 	"github.com/creack/pty"
 )
 
-var port int
+var (
+	port   int
+	secret []byte
+)
 
 func main() {
 	flag.IntVar(&port, "port", 8787, "listen port")
 	flag.Parse()
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("/ws", wsHandler)
-	mux.Handle("/", http.FileServer(http.Dir("./public"))) // optional UI
+	var sec_path = "/jffs/addons/idefix/sec.key"
 
+	raw, err := os.ReadFile(sec_path)
+	if err != nil {
+		panic("missing " + sec_path + " file")
+	}
+	secret, _ = hex.DecodeString(string(bytes.TrimSpace(raw)))
+
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("/ws", wsHandler)
 	addr := ":" + strconv.Itoa(port)
 	fmt.Printf("⚡ WebSocket PTY listening on %s/ws\n", addr)
 
@@ -41,9 +52,7 @@ func main() {
 func wsHandler(w http.ResponseWriter, r *http.Request) {
 
 	if !authorised(r) {
-		fmt.Println("Unauthorized access")
-		w.Header().Set("WWW-Authenticate", `Basic realm="Restricted"`)
-		w.WriteHeader(401)
+		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
 
@@ -59,6 +68,7 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 	defer c.Close(websocket.StatusNormalClosure, "")
 
 	ptmx, proc, err := startShell(80, 24)
+	fmt.Printf("Connected to shell from %s\n", r.RemoteAddr)
 	if err != nil {
 		c.Close(websocket.StatusInternalError, err.Error())
 		return
@@ -108,66 +118,39 @@ func resizePTY(f *os.File, cols, rows int) {
 }
 
 func authorised(r *http.Request) bool {
-	tok, _ := r.Cookie("asus_token")
-	fmt.Println("Token:", tok)
+	q := r.URL.Query()
+	c := q.Get("c")
+	s := q.Get("s")
+	t := q.Get("t")
 
-	if tok == nil {
+	if c == "" || s == "" || t == "" {
 		return false
 	}
-	if tok.Value == "" {
-		return false
-	}
-	if tokenValid(tok.Value) {
-		return true
-	}
-	return false
-}
 
-var routerIP = "192.168.1.1"
-
-func tokenValid(token string) bool {
-	u := url.URL{Scheme: "http", Host: net.JoinHostPort("127.0.0.1", "80"),
-		Path: "/ajax_status.xml"}
-
-	if httpsOnly() {
-		u.Scheme = "https"
-		u.Host = net.JoinHostPort("127.0.0.1", "443")
-	}
-
-	req, err := http.NewRequest("GET", u.String(), nil)
+	ts, err := strconv.ParseInt(t, 10, 64)
 	if err != nil {
 		return false
 	}
-
-	req.Header.Set("Cookie", "asus_token="+token)
-	req.Host = routerIP
-
-	cli := http.DefaultClient
-	if u.Scheme == "https" {
-		cli = &http.Client{
-			Timeout: 2 * time.Second,
-			Transport: &http.Transport{
-				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-			},
-		}
+	if time.Since(time.Unix(ts, 0)) > 2*time.Minute {
+		fmt.Println("token expired")
+		return false
 	}
 
-	resp, err := cli.Do(req)
+	mac := hmac.New(sha256.New, secret)
+	mac.Write([]byte(c))
+	mac.Write([]byte("|"))
+	mac.Write([]byte(t))
+	expected := mac.Sum(nil)
+
+	sent, err := hex.DecodeString(s)
 	if err != nil {
 		return false
 	}
-	resp.Body.Close()
-	return resp.StatusCode == http.StatusOK
-}
-
-func httpsOnly() bool {
-	// quick probe – open port 80; if closed, assume HTTPS-only
-	c, err := net.DialTimeout("tcp", "127.0.0.1:80", time.Second)
-	if err != nil {
-		return true
+	if !hmac.Equal(expected, sent) {
+		fmt.Println("bad signature")
+		return false
 	}
-	c.Close()
-	return false
+	return true
 }
 
 type wsWriter struct{ *websocket.Conn }

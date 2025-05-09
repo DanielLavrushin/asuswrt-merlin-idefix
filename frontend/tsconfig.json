@@ -18,12 +18,6 @@
       "@/*": ["frontend/*"]
     }
   },
-  "include": [
-    "frontend/**/*.ts",
-    "frontend/**/*.tsx",
-    "index.ts",
-    "*.d.ts",
-    "vite.config.ts"
-  ],
+  "include": ["frontend/**/*.ts", "frontend/**/*.tsx", "index.ts", "frontend/*.d.ts", "vite.config.ts"],
   "exclude": ["node_modules"]
 }

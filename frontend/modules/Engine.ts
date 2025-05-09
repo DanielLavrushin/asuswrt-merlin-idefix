@@ -8,7 +8,7 @@
 /* eslint-disable @typescript-eslint/no-misused-promises */
 import axios from 'axios';
 
-class EngineLoadingProgress {
+export class EngineLoadingProgress {
   public progress = 0;
   public message = '';
 
@@ -28,10 +28,18 @@ class EngineResponseConfig {
 
 /* eslint-disable @typescript-eslint/no-unused-vars */
 export enum SubmitActions {
-  restart = 'idefix_restart'
+  restart = 'idefix_restart',
+  generateToken = 'idefix_generate_token',
+  update = 'idefix_update'
 }
 
+export interface EngineToken {
+  sig?: string;
+  ts?: number;
+  cl?: string;
+}
 class Engine {
+  public token: EngineToken | undefined;
   private splitPayload(payload: string, chunkSize: number): string[] {
     const chunks: string[] = [];
     let index = 0;
@@ -43,12 +51,13 @@ class Engine {
   }
   public delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-  public setCookie = (name: string, val: string): void => {
-    const date = new Date();
-    const value = val;
-    date.setTime(date.getTime() + 365 * 24 * 60 * 60 * 1000);
-    document.cookie = name + '=' + value + '; expires=' + date.toUTCString() + '; path=/';
-  };
+  public setCookie(name: string, val: string) {
+    const oneYear = 365 * 24 * 60 * 60 * 1000;
+    const expires = new Date(Date.now() + oneYear).toUTCString();
+    const safeVal = encodeURIComponent(val);
+
+    document.cookie = `${encodeURIComponent(name)}=${safeVal}; ` + `expires=${expires}; path=/; SameSite=Lax`;
+  }
 
   public getCookie = (name: string): string | undefined => {
     const value = '; ' + document.cookie;
@@ -74,6 +83,14 @@ class Engine {
     });
     let responseConfig = response.data;
     return responseConfig;
+  }
+
+  async getServerToken(): Promise<EngineToken | undefined> {
+    const response = await axios.get<EngineToken>(`/ext/idefix/token.json?_=${Date.now()}`);
+
+    this.token = response.data;
+
+    return this.token;
   }
 
   public submit(action: string, payload: object | string | number | null | undefined = undefined, delay = 1000): Promise<void> {
