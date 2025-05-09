@@ -23,9 +23,11 @@ function App() {
           flexDirection: 'column'
         }}
       >
-        <Typography variant="h5" sx={{ p: 2 }}>
-          Idefix Terminal
-        </Typography>
+        <Box className="formfonttitle" sx={{ p: 0, pt: 4, pl: 1 }}>
+          IDEFIX Terminal
+        </Box>
+        <Box sx={{ m: 1, mt: 0, mb: 1.5 }} className="splitLine"></Box>
+
         <IdefixTerminal onStatusChange={setStatus} />
         <Box
           component="img"
