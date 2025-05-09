@@ -26,7 +26,7 @@ stop() {
     fi
 
     # Stop the process
-    killall idefix-server 2>/dev/null && log_ok "$ADDON_TITLE stopped." || log_error "$ADDON_TITLE failed to stop."
+    killall idefix-server 2>/dev/null && log_ok "$ADDON_TITLE stopped."
     rm -f /var/run/$ADDON_TAG.pid
 
     firewall_clear_rules

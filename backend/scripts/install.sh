@@ -62,6 +62,8 @@ setup_script_file() {
 
 install() {
 
+    log_info "Installing $ADDON_TITLE $ADDON_VERSION..."
+
     # Add or update post-mount
     setup_script_file "/jffs/scripts/post-mount" "/jffs/scripts/idefix startup & #idefix"
 
@@ -70,9 +72,24 @@ install() {
 
     generate_secret
     firewall_add_rules
-    remount_ui
 
     am_settings_set "idefix_version" "$ADDON_VERSION"
+
+    local tmp_dir="/tmp/idefix"
+    mkdir -p /jffs/share/idefix
+
+    mv "$tmp_dir/idefix/app.js" /jffs/share/idefix
+    mv "$tmp_dir/idefix/index.asp" /jffs/share/idefix
+
+    mv "$tmp_dir/idefix/idefix-server" /jffs/scripts/idefix
+
+    chmod 0755 /jffs/scripts/idefix-server
+
+    remount_ui
+
+    ln -s -f "$ADDON_SCRIPT" "/opt/bin/$ADDON_TAG" || log_error "Failed to create symlink for $ADDON_TAG."
+
+    rm -rf "$tmp_dir"
 
     log_box "$ADDON_TITLE $ADDON_VERSION installed successfully."
 }
@@ -83,6 +100,13 @@ uninstall() {
     firewall_clear_rules
 
     am_settings_del "idefix"
+
+    rm -rf /jffs/scripts/idefix
+    rm -rf /opt/share/idefix
+
+    rm -rf /www/user/idefix
+
+    rm -rf "/opt/bin/$ADDON_TAG" || log_error "Failed to remove symlink for $ADDON_TAG."
 
     log_box "$ADDON_TITLE $ADDON_VERSION uninstalled successfully."
 }

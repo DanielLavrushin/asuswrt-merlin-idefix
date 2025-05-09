@@ -6,6 +6,7 @@ import ./_helper.sh
 import ./mount.sh
 import ./control.sh
 import ./install.sh
+import ./update.sh
 import ./lock.sh
 import ./token.sh
 import ./firewall.sh
@@ -39,7 +40,7 @@ uninstall)
     uninstall
     ;;
 update)
-    update
+    update "$2"
     ;;
 service_event)
     case "$2" in
