@@ -35,7 +35,7 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Update XRAYUI Version
+      - name: Update Version
         env:
           ADDON_VERSION: ${{ github.event.inputs.version }}
         run: |
@@ -43,7 +43,7 @@ jobs:
           sed -i "s/^ADDON_VERSION=.*/ADDON_VERSION=\"$ADDON_VERSION\"/" dist/idefix
 
       - name: Archive  dist
-        run: tar --transform 's|^|idefix/|' -czf asuswrt-merlin-xrayui.tar.gz -C dist .
+        run: tar --transform 's|^|idefix/|' -czf asuswrt-merlin-idefix.tar.gz -C dist .
 
       - name: Setup Go
         uses: actions/setup-go@v5
