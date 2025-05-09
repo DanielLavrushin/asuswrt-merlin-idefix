@@ -2,15 +2,19 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
+	"crypto/tls"
 	"encoding/hex"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
+	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -21,10 +25,80 @@ import (
 	"github.com/creack/pty"
 )
 
+const (
+	plainAddr = ":8787"
+	tlsAddr   = ":8787"
+	certFile  = "/jffs/addons/idefix/cert.pem"
+	keyFile   = "/jffs/addons/idefix/key.pem"
+)
+
 var (
 	port   int
 	secret []byte
 )
+
+const tlsHandshakeByte byte = 0x16
+
+func ServeOnSamePort(addr, cert, key string, handler http.Handler) error {
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
+		return err
+	}
+
+	plain := &http.Server{Handler: handler}
+
+	tlsCfg, _ := tls.LoadX509KeyPair(cert, key)
+	tlsSrv := &http.Server{
+		Handler: handler,
+		TLSConfig: &tls.Config{
+			Certificates: []tls.Certificate{tlsCfg},
+		},
+	}
+
+	go tlsSrv.Serve(&tlsListener{ln})
+
+	return plain.Serve(&plainListener{ln})
+}
+
+type peekConn struct {
+	net.Conn
+	br *bufio.Reader
+}
+
+func (c *peekConn) Read(b []byte) (int, error) { return c.br.Read(b) }
+
+type plainListener struct{ net.Listener }
+type tlsListener struct{ net.Listener }
+
+func (l *plainListener) Accept() (net.Conn, error) {
+	for {
+		c, err := l.Listener.Accept()
+		if err != nil {
+			return nil, err
+		}
+
+		pc := &peekConn{Conn: c, br: bufio.NewReader(c)}
+		if b, _ := pc.br.Peek(1); len(b) == 1 && b[0] != tlsHandshakeByte {
+			return pc, nil // plain
+		}
+		c.Close()
+	}
+}
+
+func (l *tlsListener) Accept() (net.Conn, error) {
+	for {
+		c, err := l.Listener.Accept()
+		if err != nil {
+			return nil, err
+		}
+
+		pc := &peekConn{Conn: c, br: bufio.NewReader(c)}
+		if b, _ := pc.br.Peek(1); len(b) == 1 && b[0] == tlsHandshakeByte {
+			return pc, nil // TLS
+		}
+		c.Close()
+	}
+}
 
 func main() {
 	flag.IntVar(&port, "port", 8787, "listen port")
@@ -39,13 +113,11 @@ func main() {
 	secret, _ = hex.DecodeString(string(bytes.TrimSpace(raw)))
 
 	mux := http.NewServeMux()
-
 	mux.HandleFunc("/ws", wsHandler)
-	addr := ":" + strconv.Itoa(port)
-	fmt.Printf("⚡ WebSocket PTY listening on %s/ws\n", addr)
 
-	if err := http.ListenAndServe(addr, mux); err != nil && err != http.ErrServerClosed {
-		panic(err)
+	log.Printf("▶︎  WS + WSS on :8787")
+	if err := ServeOnSamePort(":8787", certFile, keyFile, mux); err != nil {
+		log.Fatal(err)
 	}
 }
 

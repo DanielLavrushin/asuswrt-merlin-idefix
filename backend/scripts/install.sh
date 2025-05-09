@@ -80,6 +80,8 @@ install() {
 
     mv "$tmp_dir/idefix-server" "$ADDON_SHARE_DIR"
 
+    create_certificates
+
     chmod 0755 "$ADDON_SERVER"
 
     remount_ui
@@ -96,6 +98,17 @@ install() {
     update_loading_progress "Installation completed successfully." false 100
 
     log_box "$ADDON_TITLE $ADDON_VERSION installed successfully."
+}
+
+create_certificates() {
+    local ipaddr="$(nvram get lan_ipaddr)"
+    mkdir -p /jffs/addons/idefix
+    openssl req -x509 -newkey rsa:2048 -nodes \
+        -keyout /jffs/addons/idefix/key.pem \
+        -out /jffs/addons/idefix/cert.pem \
+        -days 3650 \
+        -subj "/CN=$ipaddr" \
+        -addext "subjectAltName = IP:$ipaddr"
 }
 
 uninstall() {

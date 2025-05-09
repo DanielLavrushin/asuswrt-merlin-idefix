@@ -1,5 +1,11 @@
 # IDEFIX Terminal Changelog
 
+## [1.1.5] - 2025-05-09
+
+> _Important: Please clear your browser cache (e.g. **Ctrl+F5**) to ensure outdated files are updated._
+
+- FIXED: an attenpt to fix a https issue.
+
 ## [1.1.4] - 2025-05-09
 
 > _Important: Please clear your browser cache (e.g. **Ctrl+F5**) to ensure outdated files are updated._

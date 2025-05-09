@@ -11,9 +11,6 @@ export interface TerminalProps {
   onStatusChange?: (s: 'connected' | 'reconnecting' | 'offline') => void;
 }
 
-const secure = window.location.protocol === 'https:';
-
-const endpoint = `${secure ? 'wss' : 'ws'}://${window.location.host}:8787/ws`;
 const protocol = 'idefix';
 const cols = 0;
 const rows = 30;
@@ -29,6 +26,8 @@ export const IdefixTerminal: React.FC<TerminalProps> = ({ onStatusChange }) => {
   const report = (s: 'connected' | 'reconnecting' | 'offline') => onStatusChange?.(s);
 
   const [connected, setConnected] = useState<boolean>(true);
+
+  const buildEndpoint = (secure: boolean) => `${secure ? 'wss' : 'ws'}://${window.location.hostname}:8787/ws`;
 
   const fetchToken = async () => {
     setLoading(true);
@@ -67,7 +66,9 @@ export const IdefixTerminal: React.FC<TerminalProps> = ({ onStatusChange }) => {
       attachAddonRef.current?.dispose();
       socketRef.current?.close();
 
-      let url = new URL(endpoint);
+      const base = buildEndpoint(window.location.protocol === 'https:');
+
+      const url = new URL(base, window.location.href);
       url.searchParams.set('c', engine.token?.cl || '');
       url.searchParams.set('t', engine.token?.ts?.toFixed() || '');
       url.searchParams.set('s', engine.token?.sig || '');
@@ -100,7 +101,7 @@ export const IdefixTerminal: React.FC<TerminalProps> = ({ onStatusChange }) => {
       attachAddonRef.current = attachAddon;
       setLoading(false);
     },
-    [endpoint, protocol]
+    [protocol]
   );
 
   useLayoutEffect(() => {
