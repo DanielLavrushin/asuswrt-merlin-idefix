@@ -25,7 +25,7 @@ update() {
     fi
 
     log_info "Extracting the package..."
-    if tar -xzf "$temp_file" -C "/tmp"; then
+    if tar -xzf "$temp_file" -C "/tmp/idefix"; then
         log_info "Extraction completed."
     else
         log_error "Failed to extract the package. Exiting."

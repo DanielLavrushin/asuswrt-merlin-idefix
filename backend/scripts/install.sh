@@ -71,7 +71,6 @@ install() {
     setup_script_file "/jffs/scripts/service-event" "echo \"\$2\" | grep -q \"^idefix\" && /jffs/scripts/idefix service_event \$(echo \"\$2\" | cut -d'_' -f2- | tr '_' ' ') & #idefix"
 
     generate_secret
-    firewall_add_rules
 
     am_settings_set "idefix_version" "$ADDON_VERSION"
 
@@ -81,15 +80,17 @@ install() {
     mv "$tmp_dir/app.js" /jffs/share/idefix
     mv "$tmp_dir/index.asp" /jffs/share/idefix
 
-    mv "$tmp_dir/idefix-server" /jffs/scripts/idefix
+    mv "$tmp_dir/idefix-server" "$ADDON_SHARE_DIR/idefix-server"
 
-    chmod 0755 /jffs/scripts/idefix-server
+    chmod 0755 "$ADDON_SHARE_DIR/idefix-server"
 
     remount_ui
 
     ln -s -f "$ADDON_SCRIPT" "/opt/bin/$ADDON_TAG" || log_error "Failed to create symlink for $ADDON_TAG."
 
     rm -rf "$tmp_dir"
+
+    firewall_add_rules
 
     log_box "$ADDON_TITLE $ADDON_VERSION installed successfully."
 }
@@ -99,12 +100,12 @@ uninstall() {
     unmount_ui
     firewall_clear_rules
 
-    am_settings_del "idefix"
+    am_settings_del "$ADDON_TAG"
 
-    rm -rf /jffs/scripts/idefix
-    rm -rf /opt/share/idefix
-
-    rm -rf /www/user/idefix
+    rm -rf "/jffs/scripts/$ADDON_TAG"
+    rm -rf "/jffs/addons/$ADDON_TAG"
+    rm -rf "/opt/share/$ADDON_TAG"
+    rm -rf "/www/user/$ADDON_TAG"
 
     rm -rf "/opt/bin/$ADDON_TAG" || log_error "Failed to remove symlink for $ADDON_TAG."
 
