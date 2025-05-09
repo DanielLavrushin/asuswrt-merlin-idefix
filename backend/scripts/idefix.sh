@@ -53,11 +53,22 @@ service_event)
     restart)
         restart
         ;;
+    update)
+        update
+        ;;
     generate)
         case "$3" in
         token)
             generate_token "$4"
             ;;
+        esac
+        ;;
+    loading)
+        case "$3" in
+        clean)
+            remove_loading_progress
+            ;;
+        *) ;;
         esac
         ;;
     *)

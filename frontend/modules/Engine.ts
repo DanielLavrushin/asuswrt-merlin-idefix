@@ -7,6 +7,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-return */
 /* eslint-disable @typescript-eslint/no-misused-promises */
 import axios from 'axios';
+import { useLoadingBridge } from './LoadingBridge';
 
 export class EngineLoadingProgress {
   public progress = 0;
@@ -38,6 +39,13 @@ export interface EngineToken {
   ts?: number;
   cl?: string;
 }
+
+export interface LoadingBridge {
+  start: (msg?: string, progress?: number) => void;
+  update: (msg?: string, progress?: number) => void;
+  stop: () => void;
+}
+
 class Engine {
   public token: EngineToken | undefined;
   private splitPayload(payload: string, chunkSize: number): string[] {
@@ -159,39 +167,30 @@ class Engine {
     return input;
   };
 
-  async executeWithLoadingProgress(action: () => Promise<void>, windowReload = true): Promise<void> {
-    let loadingProgress = new EngineLoadingProgress(0, 'Please, wait');
-    window.showLoading(null, loadingProgress);
+  async executeWithLoadingProgress(action: () => Promise<void>, bridge: LoadingBridge, windowReload = true): Promise<void> {
+    bridge.start('Please, wait...', 0);
 
     await action();
-    await this.checkLoadingProgress(loadingProgress, windowReload);
-  }
 
-  async checkLoadingProgress(loadingProgress: EngineLoadingProgress, windowReload = true): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const checkProgressInterval = setInterval(async () => {
-        try {
-          const response = await this.getResponse();
-          if (response.loading) {
-            loadingProgress = response.loading;
-            window.updateLoadingProgress(loadingProgress);
-          } else {
-            clearInterval(checkProgressInterval);
-            window.hideLoading();
-            resolve();
-            if (windowReload) {
-              setTimeout(() => {
-                window.location.reload();
-              }, 1000);
-            }
-          }
-        } catch (error) {
-          clearInterval(checkProgressInterval);
-          window.hideLoading();
-          reject(new Error('Error while checking loading progress'));
-        }
-      }, 1000);
+    await this.checkLoadingProgress({
+      onUpdate: bridge.update,
+      onDone: bridge.stop
     });
+
+    if (windowReload) {
+      setTimeout(() => window.location.reload(), 1_000);
+    }
+  }
+  async checkLoadingProgress(opts: { onUpdate: (msg?: string, progress?: number) => void; onDone: () => void }): Promise<void> {
+    const timer = setInterval(async () => {
+      const r = await this.getResponse();
+      if (r.loading) {
+        opts.onUpdate(r.loading.message, r.loading.progress);
+      } else {
+        clearInterval(timer);
+        opts.onDone();
+      }
+    }, 1000);
   }
 }
 

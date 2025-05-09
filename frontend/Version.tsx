@@ -6,7 +6,7 @@ import vClean from 'version-clean';
 import vCompare from 'version-compare';
 import { marked } from 'marked';
 import engine, { SubmitActions } from './modules/Engine';
-import React from 'react';
+import { useLoadingBridge } from './modules/LoadingBridge';
 
 const COOKIE_NAME = 'idefix_dontupdate';
 const GITHUB_LATEST_API = 'https://api.github.com/repos/daniellavrushin/asuswrt-merlin-idefix/releases/latest';
@@ -18,7 +18,7 @@ export default function VersionBadge() {
   const [open, setOpen] = useState(false);
   const theme = useTheme();
 
-  const hasUpdate = latest !== null && vCompare(latest, current) === 1 && engine.getCookie(COOKIE_NAME) !== latest;
+  const hasUpdate = latest !== null && vCompare(latest, current) === 1;
 
   useEffect(() => {
     (async () => {
@@ -26,6 +26,7 @@ export default function VersionBadge() {
         const { data } = await axios.get(GITHUB_LATEST_API, { timeout: 5000 });
         const tag = vClean(data.tag_name);
         setLatest(tag);
+
         setChangelog(await marked.parse(data.body || ''));
         if (tag && vCompare(tag, current) === 1 && engine.getCookie(COOKIE_NAME) !== tag) {
           setOpen(true);
@@ -34,12 +35,12 @@ export default function VersionBadge() {
     })();
   }, [current]);
 
+  const loading = useLoadingBridge();
+
   const handleUpdate = useCallback(async () => {
     setOpen(false);
-    await engine.executeWithLoadingProgress(async () => {
-      await engine.submit(SubmitActions.update);
-    });
-  }, []);
+    await engine.executeWithLoadingProgress(() => engine.submit(SubmitActions.update), loading);
+  }, [loading]);
 
   const handleSkip = () => {
     if (latest) engine.setCookie(COOKIE_NAME, latest);
@@ -69,8 +70,8 @@ export default function VersionBadge() {
       </Box>
 
       <Dialog open={open} fullWidth onClose={() => setOpen(false)}>
-        <DialogTitle sx={{ bgcolor: '#2f3a3e', color: 'white' }}>{hasUpdate ? 'New version available!' : 'Version info'}</DialogTitle>
-        <DialogContent dividers sx={{ typography: 'body2', bgcolor: '#2f3a3e', color: 'white' }}>
+        <DialogTitle sx={{ bgcolor: '#2F3A3E', color: 'white' }}>{hasUpdate ? 'New version available!' : 'Version info'}</DialogTitle>
+        <DialogContent dividers sx={{ typography: 'body2', bgcolor: '#4D595D', color: 'white' }}>
           <Typography gutterBottom>
             Current version: <strong>{current}</strong>
           </Typography>
@@ -101,7 +102,7 @@ export default function VersionBadge() {
           )}
         </DialogContent>
 
-        <DialogActions sx={{ bgcolor: '#2f3a3e', color: 'white' }}>
+        <DialogActions sx={{ bgcolor: '#4D595D', color: 'white' }}>
           {hasUpdate ? (
             <>
               <Button onClick={handleSkip}>Skip&nbsp;v{latest}</Button>

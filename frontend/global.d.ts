@@ -10,6 +10,7 @@ interface AddonUiGlobal {
 declare global {
   interface Window {
     idefix: AddonUiGlobal;
+
     confirm: (message?: string) => boolean;
     hint: (message: string) => void;
     overlib: (message: string) => void;
