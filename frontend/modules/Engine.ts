@@ -189,12 +189,16 @@ class Engine {
         opts.onUpdate(r.loading.message, r.loading.progress);
 
         if (typeof r.loading.progress === 'number' && r.loading.progress >= 100) {
-          clearInterval(timer);
-          opts.onDone();
+          setTimeout(() => {
+            clearInterval(timer);
+            opts.onDone();
+          }, 1000);
         }
       } else {
-        clearInterval(timer);
-        opts.onDone();
+        setTimeout(() => {
+          clearInterval(timer);
+          opts.onDone();
+        }, 1000);
       }
     }, 300);
   }
