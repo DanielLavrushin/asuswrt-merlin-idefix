@@ -9,7 +9,7 @@
 
 ![image](https://github.com/user-attachments/assets/d535a0da-0d06-44a1-ba3a-7a7c21e84a72)
 
-A self-contained erminal that plugs straight into the *Merlin* Web UI.
+A self-contained terminal that plugs straight into the *Merlin* Web UI.
 
 ## Quick install
 
