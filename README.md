@@ -12,9 +12,8 @@
 A self-contained terminal that plugs straight into the *Merlin* Web UI.
 
 ## Quick install
-
+SSH into your router
 ```bash
-# SSH into your router as admin
 wget -O /tmp/idefix-install.sh \
   https://raw.githubusercontent.com/DanielLavrushin/asuswrt-merlin-idefix/refs/heads/main/install.sh \
   && chmod 0755 /tmp/idefix-install.sh \
