@@ -85,7 +85,10 @@ jobs:
 
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
+          tag_name: v${{ github.event.inputs.version }}
           files: |
             asuswrt-merlin-idefix.tar.gz
             dist/server/idefix-server-amd64.tar.gz
