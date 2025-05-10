@@ -24,7 +24,7 @@ function App() {
         }}
       >
         <Box className="formfonttitle" sx={{ p: 0, pt: 4, pl: 1 }}>
-          IDEFIX Terminal
+          🐾 IDEFIX Terminal
         </Box>
         <Box sx={{ m: 1, mt: 0, mb: 1.5 }} className="splitLine"></Box>
 

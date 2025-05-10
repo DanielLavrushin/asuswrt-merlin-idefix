@@ -2,7 +2,6 @@
 package main
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"crypto/hmac"
@@ -23,82 +22,18 @@ import (
 
 	"github.com/coder/websocket"
 	"github.com/creack/pty"
+	"github.com/soheilhy/cmux"
 )
 
 const (
-	plainAddr = ":8787"
-	tlsAddr   = ":8787"
-	certFile  = "/jffs/addons/idefix/cert.pem"
-	keyFile   = "/jffs/addons/idefix/key.pem"
+	certFile = "/etc/cert.pem"
+	keyFile  = "/etc/key.pem"
 )
 
 var (
 	port   int
 	secret []byte
 )
-
-const tlsHandshakeByte byte = 0x16
-
-func ServeOnSamePort(addr, cert, key string, handler http.Handler) error {
-	ln, err := net.Listen("tcp", addr)
-	if err != nil {
-		return err
-	}
-
-	plain := &http.Server{Handler: handler}
-
-	tlsCfg, _ := tls.LoadX509KeyPair(cert, key)
-	tlsSrv := &http.Server{
-		Handler: handler,
-		TLSConfig: &tls.Config{
-			Certificates: []tls.Certificate{tlsCfg},
-		},
-	}
-
-	go tlsSrv.Serve(&tlsListener{ln})
-
-	return plain.Serve(&plainListener{ln})
-}
-
-type peekConn struct {
-	net.Conn
-	br *bufio.Reader
-}
-
-func (c *peekConn) Read(b []byte) (int, error) { return c.br.Read(b) }
-
-type plainListener struct{ net.Listener }
-type tlsListener struct{ net.Listener }
-
-func (l *plainListener) Accept() (net.Conn, error) {
-	for {
-		c, err := l.Listener.Accept()
-		if err != nil {
-			return nil, err
-		}
-
-		pc := &peekConn{Conn: c, br: bufio.NewReader(c)}
-		if b, _ := pc.br.Peek(1); len(b) == 1 && b[0] != tlsHandshakeByte {
-			return pc, nil // plain
-		}
-		c.Close()
-	}
-}
-
-func (l *tlsListener) Accept() (net.Conn, error) {
-	for {
-		c, err := l.Listener.Accept()
-		if err != nil {
-			return nil, err
-		}
-
-		pc := &peekConn{Conn: c, br: bufio.NewReader(c)}
-		if b, _ := pc.br.Peek(1); len(b) == 1 && b[0] == tlsHandshakeByte {
-			return pc, nil // TLS
-		}
-		c.Close()
-	}
-}
 
 func main() {
 	flag.IntVar(&port, "port", 8787, "listen port")
@@ -115,16 +50,32 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/ws", wsHandler)
 
-	log.Printf("▶︎  WS + WSS on :8787")
-	if err := ServeOnSamePort(":8787", certFile, keyFile, mux); err != nil {
-		log.Fatal(err)
+	ln, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+	if err != nil {
+		log.Fatalf("listen: %v", err)
 	}
+
+	m := cmux.New(ln)
+
+	tlsCfg, _ := tls.LoadX509KeyPair(certFile, keyFile)
+	tlsL := tls.NewListener(m.Match(cmux.TLS()), &tls.Config{
+		Certificates: []tls.Certificate{tlsCfg},
+	})
+
+	httpL := m.Match(cmux.HTTP1Fast())
+
+	go (&http.Server{Handler: mux}).Serve(httpL)
+	go (&http.Server{Handler: mux}).Serve(tlsL)
+
+	log.Printf("🐾 Idefix Terminal Server on :%d", port)
+	log.Fatal(m.Serve())
 }
 
 func wsHandler(w http.ResponseWriter, r *http.Request) {
 
 	if !authorised(r) {
 		http.Error(w, "Forbidden", http.StatusForbidden)
+		fmt.Println("Forbidden")
 		return
 	}
 
@@ -152,6 +103,11 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 
 	go func() {
 		_, _ = io.Copy(wsWriter{c}, ptmx)
+	}()
+
+	go func() {
+		proc.Wait()
+		c.Close(websocket.StatusNormalClosure, "shell exited")
 	}()
 
 	ctx := r.Context()
