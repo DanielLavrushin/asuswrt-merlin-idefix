@@ -1,5 +1,9 @@
 # IDEFIX Terminal Changelog
 
+## [1.2.1] - 2025-05-18
+
+- ADDED: Additional logging
+
 ## [1.2.0] - 2025-05-17
 
 > _Important: Please clear your browser cache (e.g. **Ctrl+F5**) to ensure outdated files are updated._
