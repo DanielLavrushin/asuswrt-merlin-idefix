@@ -51,10 +51,7 @@
   "compounds": [
     {
       "name": "ACIW: Debug",
-      "configurations": [
-        "ACIW: Run Renderer Dev Server",
-        "ACIW: Debug Electron"
-      ],
+      "configurations": ["ACIW: Run Renderer Dev Server", "ACIW: Debug Electron"],
       "stopAll": true,
       "preLaunchTask": "ACIW: Watch Main"
     }

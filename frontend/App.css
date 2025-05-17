@@ -1,6 +1,6 @@
 #root {
   width: 760px;
-  height: 100vh;
+  height: calc(100vh + 280px);
   display: flex;
   flex-direction: column;
   background-color: #4d595d;

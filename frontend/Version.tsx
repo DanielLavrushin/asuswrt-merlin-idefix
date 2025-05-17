@@ -51,9 +51,6 @@ export default function VersionBadge() {
     <>
       <Box
         sx={{
-          position: 'absolute',
-          bottom: 8,
-          right: 8,
           display: 'flex',
           alignItems: 'center',
           gap: 0.5,
@@ -85,7 +82,6 @@ export default function VersionBadge() {
                 sx={{
                   mt: 2,
                   p: 1,
-
                   border: '1px solid',
                   color: 'white',
                   borderRadius: 1,

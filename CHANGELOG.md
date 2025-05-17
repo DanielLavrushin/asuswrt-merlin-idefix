@@ -1,5 +1,12 @@
 # IDEFIX Terminal Changelog
 
+## [1.2.0] - 2025-05-17
+
+> _Important: Please clear your browser cache (e.g. **Ctrl+F5**) to ensure outdated files are updated._
+
+- FIXED: Terminal now picks up the correct width and height on first load, window resizes, and fullscreen toggles.
+- FIXED: Idefix—our super-duper mascot dog — no longer overlaps the terminal pane. If his fluffy face is still too distracting, you can hide him with a single click (cookie-based)… though I won’t ask about your conscience.
+
 ## [1.1.6] - 2025-05-11
 
 > _Important: Please clear your browser cache (e.g. **Ctrl+F5**) to ensure outdated files are updated._

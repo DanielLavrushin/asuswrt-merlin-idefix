@@ -15,7 +15,7 @@ export interface TerminalProps {
 
 const protocol = 'idefix';
 const cols = 0;
-const rows = 50;
+const rows = 0;
 
 export const IdefixTerminal: React.FC<TerminalProps> = ({ onStatusChange }) => {
   const terminalRef = useRef<HTMLDivElement | null>(null);
@@ -44,7 +44,6 @@ export const IdefixTerminal: React.FC<TerminalProps> = ({ onStatusChange }) => {
     if (!term || !fit) return;
 
     fit.fit();
-
     if (sock && sock.readyState === WebSocket.OPEN) {
       const msg = JSON.stringify({
         type: 'resize',
@@ -66,8 +65,19 @@ export const IdefixTerminal: React.FC<TerminalProps> = ({ onStatusChange }) => {
 
   useEffect(() => {
     setConnected(false);
-
     fetchToken();
+
+    const node = wrapperRef.current;
+    if (!node) return;
+
+    const onTransitionEnd = (e: TransitionEvent) => {
+      if (e.propertyName === 'width' || e.propertyName === 'height') {
+        requestAnimationFrame(fitAndResize);
+      }
+    };
+
+    node.addEventListener('transitionend', onTransitionEnd);
+    return () => node.removeEventListener('transitionend', onTransitionEnd);
   }, []);
 
   const generateToken = () => {
@@ -178,13 +188,15 @@ export const IdefixTerminal: React.FC<TerminalProps> = ({ onStatusChange }) => {
       <Stack
         ref={wrapperRef}
         sx={{
+          flex: wide ? undefined : 1,
           position: wide ? 'fixed' : 'relative',
           inset: wide ? 0 : 'auto',
           m: wide ? 'auto' : 0,
           width: wide ? '70vw' : '100%',
-          height: wide ? '80vh' : 'unset',
+          height: wide ? '80vh' : 'auto',
           zIndex: wide ? 1300 : 'auto',
-          transition: 'all .25s cubic-bezier(.4,0,.2,1)'
+          minHeight: '80vh',
+          transition: 'height .25s cubic-bezier(.4,0,.2,1), width .25s cubic-bezier(.4,0,.2,1)'
         }}
       >
         <IconButton
@@ -193,7 +205,7 @@ export const IdefixTerminal: React.FC<TerminalProps> = ({ onStatusChange }) => {
           size="small"
           sx={{
             position: 'absolute',
-            top: 4,
+            top: 6,
             right: 4,
             bgcolor: 'rgba(0,0,0,.35)',
             color: 'white',
