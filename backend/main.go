@@ -114,6 +114,7 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 	for {
 		msgType, rdr, err := c.Reader(ctx)
 		if err != nil {
+			fmt.Println("WS read error:", err)
 			break
 		}
 		data, _ := io.ReadAll(rdr)
