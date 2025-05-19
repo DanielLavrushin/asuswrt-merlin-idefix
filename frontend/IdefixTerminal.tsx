@@ -97,7 +97,7 @@ export const IdefixTerminal: React.FC<TerminalProps> = ({ onStatusChange }) => {
         report('reconnecting');
         setLoading(true);
         await engine.submit(SubmitActions.restart);
-        await engine.delay(3000);
+        await engine.delay(4000);
       }
       attachAddonRef.current?.dispose();
       socketRef.current?.close();

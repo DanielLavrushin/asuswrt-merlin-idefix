@@ -1,7 +1,7 @@
 
 BINARY_NAME=idefix-server
 OUTPUT_DIR=./../dist/server
-SRC=main.go
+SRC=./
 
 
 GOBIN := $(shell go env GOBIN)
@@ -25,6 +25,9 @@ build_arm64:
 build_linux:
 	GOOS=linux GOARCH=amd64 go build -o "$(OUTPUT_DIR)/amd64/$(BINARY_NAME)" $(SRC)
 
+build_and_copy:
+	make build_arm64
+	cp $(OUTPUT_DIR)/arm64/$(BINARY_NAME) $(HOME)/router/opt/share/idefix/idefix-server
 
 .PHONY: dev
 dev:                                       

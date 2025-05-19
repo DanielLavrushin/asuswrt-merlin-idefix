@@ -1,8 +1,8 @@
 # IDEFIX Terminal Changelog
 
-## [1.2.1] - 2025-05-18
+## [1.2.2] - 2025-05-19
 
-- ADDED: Additional logging
+- ADDED: `Idefix Terminal` now writes its status and error messages straight to the router’s System Log (tagged IDEFIX). You can follow startups, client connections, shell launches, and warnings directly from the Merlin web UI or `/tmp/syslog.log`.
 
 ## [1.2.0] - 2025-05-17
 

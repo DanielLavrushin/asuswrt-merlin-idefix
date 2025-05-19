@@ -36,10 +36,13 @@ var (
 )
 
 func main() {
+
 	flag.IntVar(&port, "port", 8787, "listen port")
 	flag.Parse()
 
-	var sec_path = "/jffs/addons/idefix/sec.key"
+	setupLogging()
+
+	const sec_path = "/jffs/addons/idefix/sec.key"
 
 	raw, err := os.ReadFile(sec_path)
 	if err != nil {
@@ -60,6 +63,7 @@ func main() {
 	tlsCfg, _ := tls.LoadX509KeyPair(certFile, keyFile)
 	tlsL := tls.NewListener(m.Match(cmux.TLS()), &tls.Config{
 		Certificates: []tls.Certificate{tlsCfg},
+		NextProtos:   []string{"h2", "http/1.1"},
 	})
 
 	httpL := m.Match(cmux.HTTP1Fast())
@@ -74,10 +78,12 @@ func main() {
 func wsHandler(w http.ResponseWriter, r *http.Request) {
 
 	if !authorised(r) {
+		log.Printf("unauthorised from %s – c=%q  t=%q", r.RemoteAddr, r.URL.Query().Get("c"), r.URL.Query().Get("t"))
 		http.Error(w, "Forbidden", http.StatusForbidden)
-		fmt.Println("Forbidden")
 		return
 	}
+
+	log.Printf("authorised client %s (c=%s)", r.RemoteAddr, r.URL.Query().Get("c"))
 
 	c, err := websocket.Accept(w, r, &websocket.AcceptOptions{
 		Subprotocols:       []string{"idefix"},
@@ -85,20 +91,28 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 		InsecureSkipVerify: true,
 	})
 	if err != nil {
-		fmt.Println("WS upgrade failed:", err)
+		log.Printf("WS upgrade failed from %s: %v", r.RemoteAddr, err)
 		return
 	}
+
+	log.Printf("WS connected (%s)", r.RemoteAddr)
+
 	defer c.Close(websocket.StatusNormalClosure, "")
 
 	ptmx, proc, err := startShell(80, 24)
 	fmt.Printf("Connected to shell from %s\n", r.RemoteAddr)
 	if err != nil {
+		log.Printf("shell start error: %v", err)
 		c.Close(websocket.StatusInternalError, err.Error())
 		return
 	}
+
+	log.Printf("shell pid=%d for %s", proc.Process.Pid, r.RemoteAddr)
+
 	defer func() {
 		proc.Process.Kill()
 		ptmx.Close()
+		log.Printf("shell pid=%d closed (%s)", proc.Process.Pid, r.RemoteAddr)
 	}()
 
 	go func() {
@@ -114,7 +128,7 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 	for {
 		msgType, rdr, err := c.Reader(ctx)
 		if err != nil {
-			fmt.Println("WS read error:", err)
+			log.Printf("WS read error (%s): %v", r.RemoteAddr, err)
 			break
 		}
 		data, _ := io.ReadAll(rdr)
@@ -137,6 +151,7 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 
 func startShell(cols, rows int) (ptmx *os.File, cmd *exec.Cmd, err error) {
 	cmd = exec.Command("/bin/sh") // BusyBox ash on Merlin
+	log.Printf("Starting shell: %s", cmd.String())
 	winsz := &pty.Winsize{Cols: uint16(cols), Rows: uint16(rows)}
 	ptmx, err = pty.StartWithSize(cmd, winsz)
 	return
