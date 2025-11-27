@@ -26,8 +26,8 @@ import (
 )
 
 const (
-	certFile = "/etc/cert.pem"
-	keyFile  = "/etc/key.pem"
+	certFile = "/jffs/addons/idefix/cert.pem"
+	keyFile  = "/jffs/addons/idefix/key.pem"
 )
 
 var (
@@ -60,7 +60,10 @@ func main() {
 
 	m := cmux.New(ln)
 
-	tlsCfg, _ := tls.LoadX509KeyPair(certFile, keyFile)
+	tlsCfg, err := tls.LoadX509KeyPair(certFile, keyFile)
+	if err != nil {
+		log.Printf("TLS cert load failed: %v - HTTPS will not work", err)
+	}
 	tlsL := tls.NewListener(m.Match(cmux.TLS()), &tls.Config{
 		Certificates: []tls.Certificate{tlsCfg},
 		NextProtos:   []string{"h2", "http/1.1"},

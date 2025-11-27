@@ -116,8 +116,10 @@ export const IdefixTerminal: React.FC<TerminalProps> = ({ onStatusChange }) => {
         setConnected(true);
         report('connected');
       });
-      socket.addEventListener('close', async (evt) => {
-        if (token?.ts && Date.now() - token.ts * 1000 > 110 * 1000) {
+
+      socket.addEventListener('close', async () => {
+        const currentToken = engine.token;
+        if (currentToken?.ts && Date.now() - currentToken.ts * 1000 > 115 * 1000) {
           await fetchToken();
           connectSocket();
         } else {
@@ -125,6 +127,7 @@ export const IdefixTerminal: React.FC<TerminalProps> = ({ onStatusChange }) => {
           report('offline');
         }
       });
+
       socket.addEventListener('error', () => {
         setConnected(false);
         report('offline');

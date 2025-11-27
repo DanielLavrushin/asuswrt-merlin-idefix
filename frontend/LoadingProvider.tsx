@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { Backdrop, CircularProgress, LinearProgress, Stack, Typography, Fade } from '@mui/material';
+import { createContext, useContext, useState, ReactNode } from 'react';
+import { Backdrop, CircularProgress, Stack, Typography, Fade } from '@mui/material';
 
 type LoadingState = { open: boolean; progress?: number; message?: string };
 type LoadingApi = {

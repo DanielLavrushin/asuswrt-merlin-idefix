@@ -1,5 +1,5 @@
-import { AppBar, Box, Chip, ChipProps, Typography } from '@mui/material';
-import React, { useEffect, useState } from 'react';
+import { Box, ChipProps } from '@mui/material';
+import { useEffect, useState } from 'react';
 import IdefixTerminal from './IdefixTerminal';
 import './App.css';
 import idefixBg from './assets/idefix.png?inline';

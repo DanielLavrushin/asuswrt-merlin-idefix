@@ -41,10 +41,8 @@ restart() {
 
 startup() {
     log_info "Starting $ADDON_TITLE on startup..."
-
     firewall_add_rules
     generate_secret
     remount_ui
-
-    log_ok "$ADDON_TITLE started with PID: $pid"
+    start  
 }
