@@ -177,30 +177,39 @@ class Engine {
       onDone: bridge.stop
     });
 
-    if (windowReload) {
-      setTimeout(() => window.location.reload(), 1000);
+  if (windowReload) {
+      setTimeout(() => {
+        window.location.href = window.location.pathname + '?updated=' + Date.now();
+      }, 500);
     }
   }
-  async checkLoadingProgress(opts: { onUpdate: (msg?: string, progress?: number) => void; onDone: () => void }): Promise<void> {
-    const timer = setInterval(async () => {
-      const r = await this.getResponse();
 
-      if (r.loading) {
-        opts.onUpdate(r.loading.message, r.loading.progress);
+ checkLoadingProgress(opts: { onUpdate: (msg?: string, progress?: number) => void; onDone: () => void }): Promise<void> {
+    return new Promise((resolve) => {
+      let seenProgress = false;
+      const timer = setInterval(async () => {
+        try {
+          const r = await this.getResponse();
 
-        if (typeof r.loading.progress === 'number' && r.loading.progress >= 100) {
-          setTimeout(() => {
+          if (r.loading) {
+            seenProgress = true;
+            opts.onUpdate(r.loading.message, r.loading.progress);
+
+            if (typeof r.loading.progress === 'number' && r.loading.progress >= 100) {
+              clearInterval(timer);
+              opts.onDone();
+              resolve();
+            }
+          } else if (seenProgress) {
             clearInterval(timer);
             opts.onDone();
-          }, 1000);
+            resolve();
+          }
+        } catch {
+          // Network error during update, keep polling
         }
-      } else {
-        setTimeout(() => {
-          clearInterval(timer);
-          opts.onDone();
-        }, 1000);
-      }
-    }, 300);
+      }, 500);
+    });
   }
 }
 

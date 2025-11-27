@@ -21,7 +21,6 @@
     <script language="JavaScript" type="text/javascript" src="/popup.js"></script>
     <script language="JavaScript" type="text/javascript" src="/help.js"></script>
     <script language="JavaScript" type="text/javascript" src="/validator.js"></script>
-    <script type="module" crossorigin src="/user/idefix/app.js"></script>
   </head>
 
   <body>
@@ -50,7 +49,7 @@
       const stripControls = /[\u0000-\u001F]+/g;
       const custom_settings = JSON.parse(custom_settings_raw.replace(stripAnsi, '').replace(stripControls, ''));
 
-      var idefix = {
+      window.idefix = {
         custom_settings
       };
       window.showLoading = function () {};
@@ -60,6 +59,9 @@
           window.show_menu();
         }
       });
+    </script>
+    <script>
+      document.write('<script type="module" crossorigin src="/user/idefix/app.js?v=' + Date.now() + '"><\/script>');
     </script>
   </body>
 </html>

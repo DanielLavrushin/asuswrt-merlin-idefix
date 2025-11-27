@@ -269,10 +269,6 @@ update_loading_progress() {
 
     echo "$json_content" >"/tmp/idefix-response.tmp" && mv -f "/tmp/idefix-response.tmp" "$ADDON_RESPONSE_FILE"
 
-    if [ "$progress" = "100" ]; then
-        $ADDON_SCRIPT service_event loading clean >/dev/null 2>&1 &
-    fi
-
 }
 
 remove_loading_progress() {
