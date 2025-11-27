@@ -61,7 +61,7 @@ export default function TerminalTabs() {
         sx={{
           display: 'flex',
           alignItems: 'center',
-          bgcolor: '#1a1f23',
+          bgcolor: '#4d595d',
           borderBottom: '1px solid #3a4449',
           px: 0.5,
           gap: 0.5,
@@ -79,16 +79,18 @@ export default function TerminalTabs() {
                 alignItems: 'center',
                 gap: 0.75,
                 px: 1.5,
-                py: isActive ? 1.15 : 0.75,
+                py: 1.15,
                 cursor: 'pointer',
-                borderRadius: '8px 8px 0 0',
-                bgcolor: isActive ? '#2f3a3e' : 'transparent',
+                borderRadius: '4px 4px 0 0',
+                bgcolor: '#2f3a3e',
                 color: isActive ? '#fff' : '#888',
+                fontWeight: isActive ? 800 : 500,
                 borderTop: isActive ? '2px solid #FFCC00' : '2px solid transparent',
                 transition: 'all 0.15s ease',
                 '&:hover': {
                   bgcolor: isActive ? '#2f3a3e' : '#252b30',
-                  color: '#ccc'
+                  color: '#ccc',
+                  py: 1.15
                 },
                 '&:hover .close-btn': {
                   opacity: 1
@@ -96,7 +98,7 @@ export default function TerminalTabs() {
               }}
             >
               <TerminalIcon sx={{ fontSize: 16, opacity: 0.7 }} />
-              <span style={{ fontSize: 13, fontWeight: 500, whiteSpace: 'nowrap' }}>Shell {t.num}</span>
+              <span style={{ fontSize: 13, whiteSpace: 'nowrap' }}>Shell {t.num}</span>
               <CloseIcon
                 className="close-btn"
                 sx={{
