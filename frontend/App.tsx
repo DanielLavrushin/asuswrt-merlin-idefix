@@ -1,6 +1,6 @@
-import { Box, ChipProps } from '@mui/material';
+import { Box } from '@mui/material';
 import { useEffect, useState } from 'react';
-import IdefixTerminal from './IdefixTerminal';
+import TerminalTabs from './TerminalTabs';
 import './App.css';
 import idefixBg from './assets/idefix.png?inline';
 import Version from './Version';
@@ -8,14 +8,7 @@ import engine from './modules/Engine';
 
 const idefixHaterCookie = 'i-hate-dogs';
 function App() {
-  const [status, setStatus] = useState<'connected' | 'reconnecting' | 'offline'>('offline');
   const [showIdefix, setShowIdefix] = useState(false);
-
-  const statusColor: ChipProps['color'] = {
-    connected: 'success',
-    reconnecting: 'warning',
-    offline: 'error'
-  }[status] as ChipProps['color'];
 
   useEffect(() => {
     const cookie = engine.getCookie(idefixHaterCookie);
@@ -41,7 +34,7 @@ function App() {
         </Box>
         <Box sx={{ m: 1, mt: 0, mb: 1.5 }} className="splitLine"></Box>
         <Box sx={{ flex: 1, height: '100%' }}>
-          <IdefixTerminal onStatusChange={setStatus} />
+          <TerminalTabs />
         </Box>
         <Box
           sx={{
@@ -75,7 +68,6 @@ Do you really want to hide this cute dog?`)
             <Version />
           </Box>
         </Box>
-        {/* <Chip color={statusColor} size="small" label={status} sx={{ textTransform: 'capitalize', top: 2, right: 0 }} /> */}
       </Box>
     </>
   );

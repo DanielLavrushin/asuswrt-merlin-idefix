@@ -2,6 +2,7 @@
 
 ## [1.3.0] - 2025-11-28
 
+- ADDED: Multi-tab terminal sessions - run up to 6 independent shell sessions simultaneously.
 - FIXED: TLS certificates now load from correct path (`/jffs/addons/idefix/`), resolving HTTPS connection failures.
 - FIXED: Server now actually starts on router boot (missing `start` call in startup sequence).
 - FIXED: TLS certificate loading errors are now logged instead of silently ignored.

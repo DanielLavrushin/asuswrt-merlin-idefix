@@ -1,10 +1,11 @@
+import './IdefixTerminal.css';
+import '@xterm/xterm/css/xterm.css';
 import React, { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { AttachAddon } from '@xterm/addon-attach';
-import '@xterm/xterm/css/xterm.css';
+
 import { Backdrop, Box, Button, CircularProgress, IconButton, Stack, Typography } from '@mui/material';
-import './IdefixTerminal.css';
 import engine, { EngineToken, SubmitActions } from './modules/Engine';
 import CloseFullscreenIcon from '@mui/icons-material/CloseFullscreen';
 import OpenInFullIcon from '@mui/icons-material/OpenInFull';
@@ -17,7 +18,7 @@ const protocol = 'idefix';
 const cols = 0;
 const rows = 0;
 
-export const IdefixTerminal: React.FC<TerminalProps> = ({ onStatusChange }) => {
+export const IdefixTerminal: React.FC<TerminalProps> = ({ onStatusChange = () => {} }) => {
   const terminalRef = useRef<HTMLDivElement | null>(null);
   const termRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);

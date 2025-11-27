@@ -20,6 +20,7 @@
   "homepage": "https://github.com/DanielLavrushin/asuswrt-merlin-idefix#readme",
   "devDependencies": {
     "@types/node": "^22.19.1",
+    "@types/react-dom": "^19.2.3",
     "@types/xterm": "^2.0.3",
     "@vitejs/plugin-react": "^4.7.0",
     "cross-env": "^7.0.3",

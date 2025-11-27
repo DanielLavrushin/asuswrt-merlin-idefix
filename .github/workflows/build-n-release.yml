@@ -29,11 +29,22 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v4
 
-      - name: Install  dependencies
-        run: npm install
+      - name: Setup PNPM
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.18.2
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+          cache-dependency-path: |
+            pnpm-lock.yaml
 
       - name: Build
-        run: npm run build
+        run: pnpm build
 
       - name: Update Version
         env:
@@ -67,28 +78,21 @@ jobs:
         run: |
           echo "Extracting latest changelog entry..."
           CHANGELOG=$(awk '/^## \[/{if (found++) exit} found {print}' CHANGELOG.md)
-          echo "changelog<<EOF" >> $GITHUB_ENV
-          echo "$CHANGELOG" >> $GITHUB_ENV
-          echo "EOF" >> $GITHUB_ENV
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGELOG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Create GitHub Release
         id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: v${{ github.event.inputs.version }}
-          release_name: 'Release ${{ github.event.inputs.version }}'
-          draft: ${{ github.event.inputs.draft == 'true' }}
-          prerelease: ${{ github.event.inputs.prerelease == 'true' }}
-          body: ${{ env.changelog }}
-
-      - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: v${{ github.event.inputs.version }}
+          name: 'Release ${{ github.event.inputs.version }}'
+          draft: ${{ github.event.inputs.draft == 'true' }}
+          prerelease: ${{ github.event.inputs.prerelease == 'true' }}
+          body: ${{ steps.read_changelog.outputs.changelog }}
           files: |
             asuswrt-merlin-idefix.tar.gz
             dist/server/idefix-server-amd64.tar.gz
