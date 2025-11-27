@@ -60,7 +60,7 @@ update_server() {
 
     log_info "Installing $ADDON_TITLE server..."
 
-    stop
+    stop || true
 
     local specific_version=${1:-"latest"}
     local temp_file="/tmp/idefix-server.tar.gz"
