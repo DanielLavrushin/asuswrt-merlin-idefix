@@ -1,5 +1,12 @@
 # IDEFIX Terminal Changelog
 
+## [1.3.0] - 2025-11-28
+
+- FIXED: TLS certificates now load from correct path (`/jffs/addons/idefix/`), resolving HTTPS connection failures.
+- FIXED: Server now actually starts on router boot (missing `start` call in startup sequence).
+- FIXED: TLS certificate loading errors are now logged instead of silently ignored.
+- FIXED: Token expiry check now uses current token state, preventing stale reconnection attempts.
+
 ## [1.2.2] - 2025-05-19
 
 - ADDED: `Idefix Terminal` now writes its status and error messages straight to the router’s System Log (tagged IDEFIX). You can follow startups, client connections, shell launches, and warnings directly from the Merlin web UI or `/tmp/syslog.log`.
