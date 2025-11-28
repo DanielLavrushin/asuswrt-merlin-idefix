@@ -66,7 +66,8 @@ export default function VersionBadge() {
         <span style={{ fontWeight: 500, color: '#fc0' }}>v{current}</span>
       </Box>
 
-      <Dialog open={open} fullWidth onClose={() => setOpen(false)}>
+      <Dialog open={open} fullWidth onClose={() => setOpen(false)} sx={{ zIndex: 1400 }}>
+        {' '}
         <DialogTitle sx={{ bgcolor: '#2F3A3E', color: 'white' }}>{hasUpdate ? 'New version available!' : 'Version info'}</DialogTitle>
         <DialogContent dividers sx={{ typography: 'body2', bgcolor: '#4D595D', color: 'white' }}>
           <Typography gutterBottom>
@@ -97,11 +98,12 @@ export default function VersionBadge() {
             <Typography>No release info available.</Typography>
           )}
         </DialogContent>
-
         <DialogActions sx={{ bgcolor: '#4D595D', color: 'white' }}>
           {hasUpdate ? (
             <>
-              <Button onClick={handleSkip}>Skip&nbsp;v{latest}</Button>
+              <Button onClick={handleSkip} variant="outlined">
+                Skip&nbsp;v{latest}
+              </Button>
               <Button variant="contained" onClick={handleUpdate}>
                 Update&nbsp;now
               </Button>

@@ -7,6 +7,7 @@
 - FIXED: Server now actually starts on router boot (missing `start` call in startup sequence).
 - FIXED: TLS certificate loading errors are now logged instead of silently ignored.
 - FIXED: Token expiry check now uses current token state, preventing stale reconnection attempts.
+- FIXED: Update dialog now appears above terminal overlay in wide/fullscreen mode.
 
 ## [1.2.2] - 2025-05-19
 
