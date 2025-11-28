@@ -25,10 +25,22 @@ import (
 	"github.com/soheilhy/cmux"
 )
 
-const (
-	certFile = "/jffs/addons/idefix/cert.pem"
-	keyFile  = "/jffs/addons/idefix/key.pem"
-)
+var certPaths = []struct{ cert, key string }{
+	{"/etc/cert.pem", "/etc/key.pem"},
+	{"/tmp/etc/cert.pem", "/tmp/etc/key.pem"},
+	{"/jffs/.cert/cert.pem", "/jffs/.cert/key.pem"},
+}
+
+func loadCert() (tls.Certificate, error) {
+	for _, p := range certPaths {
+		cert, err := tls.LoadX509KeyPair(p.cert, p.key)
+		if err == nil {
+			log.Printf("Using TLS: %s", p.cert)
+			return cert, nil
+		}
+	}
+	return tls.Certificate{}, fmt.Errorf("no certs found")
+}
 
 var (
 	port   int
@@ -60,16 +72,17 @@ func main() {
 
 	m := cmux.New(ln)
 
-	tlsCfg, err := tls.LoadX509KeyPair(certFile, keyFile)
+	tlsCfg, err := loadCert()
 	if err != nil {
-		log.Printf("TLS cert load failed: %v - HTTPS will not work", err)
+		log.Fatal(err)
 	}
+
 	tlsL := tls.NewListener(m.Match(cmux.TLS()), &tls.Config{
 		Certificates: []tls.Certificate{tlsCfg},
 		NextProtos:   []string{"h2", "http/1.1"},
 	})
 
-	httpL := m.Match(cmux.HTTP1Fast())
+	httpL := m.Match(cmux.Any())
 
 	go (&http.Server{Handler: mux}).Serve(httpL)
 	go (&http.Server{Handler: mux}).Serve(tlsL)

@@ -1,5 +1,9 @@
 # IDEFIX Terminal Changelog
 
+## [1.3.1] - 2025-11-28
+
+- FIXED: Update certificate loading logic to support multiple paths.
+
 ## [1.3.0] - 2025-11-28
 
 - ADDED: Multi-tab terminal sessions - run up to 6 independent shell sessions simultaneously.
