@@ -1,6 +1,6 @@
 # IDEFIX Terminal Changelog
 
-## [1.4.1] - 2026-04-12
+## [1.4.2] - 2026-04-12
 
 - ADDED: **Quick Commands palette** — press `Ctrl+K` or click the command button in the tab bar to open a searchable list of common router commands (logs, network, WiFi, VPN, firewall, NVRAM, Entware, and more). Commands are organized by category and can be filtered by typing.
 - ADDED: **Session export** — download the terminal scrollback as a `.log` file using the save button in the terminal toolbar. Useful for sharing debug output on forums.
