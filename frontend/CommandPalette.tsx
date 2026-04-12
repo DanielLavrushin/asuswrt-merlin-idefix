@@ -31,7 +31,8 @@ export default function CommandPalette({ open, onClose, onSelect }: Readonly<Com
     if (open) {
       setFilter('');
       setSelectedIdx(0);
-      setTimeout(() => inputRef.current?.focus(), 50);
+      const tid = setTimeout(() => inputRef.current?.focus(), 50);
+      return () => clearTimeout(tid);
     }
   }, [open]);
 
@@ -52,9 +53,11 @@ export default function CommandPalette({ open, onClose, onSelect }: Readonly<Com
       onClose();
     } else if (e.key === 'ArrowDown') {
       e.preventDefault();
+      if (filtered.length === 0) return;
       setSelectedIdx((i: number) => Math.min(i + 1, filtered.length - 1));
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
+      if (filtered.length === 0) return;
       setSelectedIdx((i: number) => Math.max(i - 1, 0));
     } else if (e.key === 'Enter' && filtered.length > 0) {
       e.preventDefault();

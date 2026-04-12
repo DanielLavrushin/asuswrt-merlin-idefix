@@ -85,7 +85,7 @@ export const IdefixTerminal = forwardRef<TerminalHandle, TerminalProps>(({ onSta
     a.href = url;
     a.download = `idefix-session-${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}.log`;
     a.click();
-    URL.revokeObjectURL(url);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
   const buildEndpoint = (secure: boolean) => `${secure ? 'wss' : 'ws'}://${window.location.hostname}:8787/ws`;
