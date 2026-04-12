@@ -10,6 +10,15 @@ start() {
         return 1
     fi
 
+    if [ -z "$TZ" ]; then
+        if [ -r /etc/TZ ]; then
+            TZ=$(cat /etc/TZ)
+        elif command -v nvram >/dev/null 2>&1; then
+            TZ=$(nvram get time_zone_dst)
+            [ -z "$TZ" ] && TZ=$(nvram get time_zone)
+        fi
+    fi
+    export TZ
     $ADDON_SERVER &
     local pid=$!
     echo $pid >/var/run/$ADDON_TAG.pid

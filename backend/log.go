@@ -2,11 +2,27 @@
 package main
 
 import (
+	"bytes"
 	"io"
 	"log"
 	"log/syslog"
 	"os"
+	"time"
 )
+
+func initTZ() {
+	if os.Getenv("TZ") == "" {
+		if raw, err := os.ReadFile("/etc/TZ"); err == nil {
+			tz := string(bytes.TrimSpace(raw))
+			if tz != "" {
+				os.Setenv("TZ", tz)
+			}
+		}
+	}
+	if loc, err := time.LoadLocation(os.Getenv("TZ")); err == nil {
+		time.Local = loc
+	}
+}
 
 var Syslog *syslog.Writer
 

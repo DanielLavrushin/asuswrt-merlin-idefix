@@ -5,19 +5,19 @@ import { fileURLToPath } from 'url';
 import fs from 'fs';
 import cssInjectedByJsPlugin from 'vite-plugin-css-injected-by-js';
 import { dirname, resolve, join } from 'path';
-import { exec } from 'child_process';
+import { exec, execSync } from 'node:child_process';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-function watchAllShFiles(pluginContext, dir) {
+function watchAllFiles(pluginContext, dir, exts) {
   const entries = fs.readdirSync(dir, { withFileTypes: true });
 
   entries.forEach((entry) => {
     const fullPath = join(dir, entry.name);
 
     if (entry.isDirectory()) {
-      watchAllShFiles(pluginContext, fullPath);
-    } else if (entry.isFile() && fullPath.endsWith('.sh')) {
+      watchAllFiles(pluginContext, fullPath, exts);
+    } else if (entry.isFile() && exts.some((e) => fullPath.endsWith(e))) {
       pluginContext.addWatchFile(fullPath);
     }
   });
@@ -70,8 +70,13 @@ export default defineConfig(({ mode }) => {
           this.addWatchFile(resolve(__dirname, 'frontend', 'index.html'));
           this.addWatchFile(resolve(__dirname, 'frontend', 'index.asp'));
 
-          const backendDir = resolve(__dirname, 'backend', 'scripts');
-          watchAllShFiles(this, backendDir);
+          const scriptsDir = resolve(__dirname, 'backend', 'scripts');
+          watchAllFiles(this, scriptsDir, ['.sh']);
+
+          const backendDir = resolve(__dirname, 'backend');
+          watchAllFiles(this, backendDir, ['.go']);
+          this.addWatchFile(resolve(backendDir, 'go.mod'));
+          this.addWatchFile(resolve(backendDir, 'go.sum'));
         },
         generateBundle(_, bundle) {
           for (const file of Object.values(bundle)) {
@@ -95,6 +100,21 @@ export default defineConfig(({ mode }) => {
             console.log('Files copied successfully.');
           } catch (e) {
             console.error('File copy error:', e);
+          }
+
+          try {
+            const goArch = process.env.IDEFIX_GOARCH || 'arm64';
+            console.log(`Building idefix-server (linux/${goArch})...`);
+            const outDir = resolve(__dirname, 'dist', 'server', goArch);
+            fs.mkdirSync(outDir, { recursive: true });
+            execSync(`go build -trimpath -ldflags "-s -w" -o "${join(outDir, 'idefix-server')}" ./`, {
+              cwd: resolve(__dirname, 'backend'),
+              env: { ...process.env, GOOS: 'linux', GOARCH: goArch },
+              stdio: 'inherit'
+            });
+            console.log('Go backend built.');
+          } catch (e) {
+            console.error('Go build error:', e);
           }
 
           console.log('Running sync.js script...');
