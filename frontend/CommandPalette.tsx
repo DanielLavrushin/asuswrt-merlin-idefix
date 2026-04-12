@@ -170,11 +170,11 @@ export function CommandPaletteButton({ onClick }: Readonly<{ onClick: () => void
         size="small"
         onClick={onClick}
         sx={{
-          color: '#888',
+          color: '#FFCC00',
           ml: 0.5,
           width: 28,
           height: 28,
-          '&:hover': { color: '#FFCC00', bgcolor: 'rgba(255,255,255,0.05)' }
+          '&:hover': { color: '#fff', bgcolor: 'rgba(255,204,0,0.15)' }
         }}
       >
         <KeyboardCommandKeyIcon sx={{ fontSize: 18 }} />

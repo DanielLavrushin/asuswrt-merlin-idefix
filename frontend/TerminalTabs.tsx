@@ -12,7 +12,7 @@ interface TabSession {
   num: number;
 }
 
-const MAX_TABS = 6;
+const MAX_TABS = 5;
 
 function genId() {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
@@ -31,8 +31,8 @@ export default function TerminalTabs() {
         setPaletteOpen((p) => !p);
       }
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    globalThis.addEventListener('keydown', handleKeyDown);
+    return () => globalThis.removeEventListener('keydown', handleKeyDown);
   }, []);
 
   const findNextNum = (existing: TabSession[]) => {
@@ -141,12 +141,12 @@ export default function TerminalTabs() {
           onClick={addTab}
           disabled={tabs.length >= MAX_TABS}
           sx={{
-            color: '#666',
+            color: '#FFCC00',
             ml: 0.5,
             width: 28,
             height: 28,
-            '&:hover': { color: '#aaa', bgcolor: 'rgba(255,255,255,0.05)' },
-            '&.Mui-disabled': { color: '#444' }
+            '&:hover': { color: '#fff', bgcolor: 'rgba(255,204,0,0.15)' },
+            '&.Mui-disabled': { color: '#555' }
           }}
         >
           <AddIcon sx={{ fontSize: 18 }} />
@@ -158,10 +158,10 @@ export default function TerminalTabs() {
               size="small"
               onClick={() => termRefs.current.get(activeId)?.clear()}
               sx={{
-                color: '#888',
+                color: '#FFCC00',
                 width: 28,
                 height: 28,
-                '&:hover': { color: '#FFCC00', bgcolor: 'rgba(255,255,255,0.05)' }
+                '&:hover': { color: '#fff', bgcolor: 'rgba(255,204,0,0.15)' }
               }}
             >
               <ClearAllIcon sx={{ fontSize: 18 }} />
