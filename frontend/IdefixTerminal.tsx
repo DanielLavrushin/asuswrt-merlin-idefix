@@ -1,14 +1,21 @@
 import './IdefixTerminal.css';
 import '@xterm/xterm/css/xterm.css';
-import React, { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState, useCallback, useImperativeHandle, forwardRef } from 'react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { AttachAddon } from '@xterm/addon-attach';
 
-import { Backdrop, Box, Button, CircularProgress, IconButton, Stack, Typography } from '@mui/material';
+import { Backdrop, Box, Button, CircularProgress, IconButton, Stack, Tooltip, Typography } from '@mui/material';
 import engine, { EngineToken, SubmitActions } from './modules/Engine';
 import CloseFullscreenIcon from '@mui/icons-material/CloseFullscreen';
 import OpenInFullIcon from '@mui/icons-material/OpenInFull';
+import SaveAltIcon from '@mui/icons-material/SaveAlt';
+
+export interface TerminalHandle {
+  sendCommand: (cmd: string) => void;
+  getBufferText: () => string;
+  clear: () => void;
+}
 
 export interface TerminalProps {
   onStatusChange?: (s: 'connected' | 'reconnecting' | 'offline') => void;
@@ -18,7 +25,7 @@ const protocol = 'idefix';
 const cols = 0;
 const rows = 0;
 
-export const IdefixTerminal: React.FC<TerminalProps> = ({ onStatusChange = () => {} }) => {
+export const IdefixTerminal = forwardRef<TerminalHandle, TerminalProps>(({ onStatusChange = () => {} }, ref) => {
   const terminalRef = useRef<HTMLDivElement | null>(null);
   const termRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
@@ -35,6 +42,51 @@ export const IdefixTerminal: React.FC<TerminalProps> = ({ onStatusChange = () =>
   };
 
   const [connected, setConnected] = useState<boolean>(true);
+
+  useImperativeHandle(ref, () => ({
+    sendCommand(cmd: string) {
+      const sock = socketRef.current;
+      if (sock && sock.readyState === WebSocket.OPEN) {
+        sock.send(new TextEncoder().encode(cmd + '\n'));
+      }
+    },
+    getBufferText() {
+      const term = termRef.current;
+      if (!term) return '';
+      const buf = term.buffer.active;
+      const lines: string[] = [];
+      for (let i = 0; i < buf.length; i++) {
+        const line = buf.getLine(i);
+        if (line) lines.push(line.translateToString(true));
+      }
+      // trim trailing empty lines
+      while (lines.length > 0 && lines[lines.length - 1].trim() === '') lines.pop();
+      return lines.join('\n');
+    },
+    clear() {
+      termRef.current?.clear();
+    }
+  }));
+
+  const exportBuffer = () => {
+    const term = termRef.current;
+    if (!term) return;
+    const buf = term.buffer.active;
+    const lines: string[] = [];
+    for (let i = 0; i < buf.length; i++) {
+      const line = buf.getLine(i);
+      if (line) lines.push(line.translateToString(true));
+    }
+    while (lines.length > 0 && lines[lines.length - 1].trim() === '') lines.pop();
+    const text = lines.join('\n') + '\n';
+    const blob = new Blob([text], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `idefix-session-${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}.log`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
 
   const buildEndpoint = (secure: boolean) => `${secure ? 'wss' : 'ws'}://${window.location.hostname}:8787/ws`;
 
@@ -203,22 +255,36 @@ export const IdefixTerminal: React.FC<TerminalProps> = ({ onStatusChange = () =>
           transition: 'height .25s cubic-bezier(.4,0,.2,1), width .25s cubic-bezier(.4,0,.2,1)'
         }}
       >
-        <IconButton
-          aria-label={wide ? 'Shrink' : 'Enlarge'}
-          onClick={toggleWide}
-          size="small"
-          sx={{
-            position: 'absolute',
-            top: 6,
-            right: 4,
-            bgcolor: 'rgba(0,0,0,.35)',
-            color: 'white',
-            '&:hover': { bgcolor: 'rgba(0,0,0,.5)' },
-            zIndex: 1301
-          }}
-        >
-          {wide ? <CloseFullscreenIcon fontSize="small" /> : <OpenInFullIcon fontSize="small" />}
-        </IconButton>
+        <Stack direction="row" spacing={0.5} sx={{ position: 'absolute', top: 6, right: 4, zIndex: 1301 }}>
+          <Tooltip title="Export session" placement="bottom">
+            <IconButton
+              aria-label="Export session"
+              onClick={exportBuffer}
+              size="small"
+              sx={{
+                bgcolor: 'rgba(0,0,0,.35)',
+                color: 'white',
+                '&:hover': { bgcolor: 'rgba(0,0,0,.5)' }
+              }}
+            >
+              <SaveAltIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title={wide ? 'Shrink' : 'Enlarge'} placement="bottom">
+            <IconButton
+              aria-label={wide ? 'Shrink' : 'Enlarge'}
+              onClick={toggleWide}
+              size="small"
+              sx={{
+                bgcolor: 'rgba(0,0,0,.35)',
+                color: 'white',
+                '&:hover': { bgcolor: 'rgba(0,0,0,.5)' }
+              }}
+            >
+              {wide ? <CloseFullscreenIcon fontSize="small" /> : <OpenInFullIcon fontSize="small" />}
+            </IconButton>
+          </Tooltip>
+        </Stack>
 
         <Box ref={terminalRef} sx={{ flex: 1, p: 0.2 }} />
         {showOverlay && (
@@ -252,6 +318,7 @@ export const IdefixTerminal: React.FC<TerminalProps> = ({ onStatusChange = () =>
       </Stack>
     </>
   );
-};
+});
 
+IdefixTerminal.displayName = 'IdefixTerminal';
 export default IdefixTerminal;

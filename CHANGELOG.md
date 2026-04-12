@@ -1,8 +1,12 @@
 # IDEFIX Terminal Changelog
 
-## [1.3.1] - 2025-11-28
+## [1.4.0] - 2026-04-12
 
+- ADDED: **Quick Commands palette** — press `Ctrl+K` or click the command button in the tab bar to open a searchable list of common router commands (logs, network, WiFi, VPN, firewall, NVRAM, Entware, and more). Commands are organized by category and can be filtered by typing.
+- ADDED: **Session export** — download the terminal scrollback as a `.log` file using the save button in the terminal toolbar. Useful for sharing debug output on forums.
+- ADDED: **Clear terminal** button in the tab bar to clear the active terminal's scrollback.
 - FIXED: Update certificate loading logic to support multiple paths.
+- FIXED: UI stopped loading on some Gnuton and third-party firmware builds. The router's httpd exports `LD_LIBRARY_PATH` pointing to firmware libraries; Entware binaries (jq, xray, find, grep etc.) inherited this and loaded an incompatible libc, causing segfaults.
 
 ## [1.3.0] - 2025-11-28
 
