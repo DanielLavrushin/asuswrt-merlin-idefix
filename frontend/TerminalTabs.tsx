@@ -31,6 +31,7 @@ export default function TerminalTabs() {
         setPaletteOpen((p) => !p);
       }
     };
+
     globalThis.addEventListener('keydown', handleKeyDown);
     return () => globalThis.removeEventListener('keydown', handleKeyDown);
   }, []);
