@@ -5,7 +5,7 @@ import { fileURLToPath } from 'url';
 import fs from 'fs';
 import cssInjectedByJsPlugin from 'vite-plugin-css-injected-by-js';
 import { dirname, resolve, join } from 'path';
-import { exec, execSync } from 'node:child_process';
+import { exec, execFileSync } from 'node:child_process';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -53,8 +53,6 @@ function inlineShellImports(scriptPath, visited = new Set(), isRoot = true) {
 }
 
 export default defineConfig(({ mode }) => {
-  const __dirname = dirname(fileURLToPath(import.meta.url));
-
   const isProduction = mode === 'production';
   const watching = process.env.VITE_WATCH === '1';
   console.log(`Building for ${isProduction ? 'production' : 'development'}...`);
@@ -103,15 +101,23 @@ export default defineConfig(({ mode }) => {
           }
 
           try {
+            const allowedArches = ['arm', 'arm64', 'amd64', 'mipsle', 'mips'];
             const goArch = process.env.IDEFIX_GOARCH || 'arm64';
+            if (!allowedArches.includes(goArch)) {
+              throw new Error(`Unsupported IDEFIX_GOARCH: ${goArch}. Allowed: ${allowedArches.join(', ')}`);
+            }
             console.log(`Building idefix-server (linux/${goArch})...`);
             const outDir = resolve(__dirname, 'dist', 'server', goArch);
             fs.mkdirSync(outDir, { recursive: true });
-            execSync(`go build -trimpath -ldflags "-s -w" -o "${join(outDir, 'idefix-server')}" ./`, {
-              cwd: resolve(__dirname, 'backend'),
-              env: { ...process.env, GOOS: 'linux', GOARCH: goArch },
-              stdio: 'inherit'
-            });
+            execFileSync(
+              'go',
+              ['build', '-trimpath', '-ldflags', '-s -w', '-o', join(outDir, 'idefix-server'), './'],
+              {
+                cwd: resolve(__dirname, 'backend'),
+                env: { ...process.env, GOOS: 'linux', GOARCH: goArch },
+                stdio: 'inherit'
+              }
+            );
             console.log('Go backend built.');
           } catch (e) {
             console.error('Go build error:', e);

@@ -19,8 +19,11 @@ func initTZ() {
 			}
 		}
 	}
-	if loc, err := time.LoadLocation(os.Getenv("TZ")); err == nil {
+	tz := os.Getenv("TZ")
+	if loc, err := time.LoadLocation(tz); err == nil {
 		time.Local = loc
+	} else {
+		log.Printf("could not load timezone %q, leaving time.Local unchanged: %v", tz, err)
 	}
 }
 

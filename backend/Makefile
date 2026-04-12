@@ -18,12 +18,15 @@ $(AIR):
 all: build_arm build_arm64 build_linux
 
 build_arm:
+	mkdir -p "$(OUTPUT_DIR)/arm"
 	GOOS=linux GOARCH=arm go build $(GO_BUILD_FLAGS) -o "$(OUTPUT_DIR)/arm/$(BINARY_NAME)" $(SRC)
 
 build_arm64:
+	mkdir -p "$(OUTPUT_DIR)/arm64"
 	GOOS=linux GOARCH=arm64 go build $(GO_BUILD_FLAGS) -o "$(OUTPUT_DIR)/arm64/$(BINARY_NAME)" $(SRC)
 
 build_linux:
+	mkdir -p "$(OUTPUT_DIR)/amd64"
 	GOOS=linux GOARCH=amd64 go build $(GO_BUILD_FLAGS) -o "$(OUTPUT_DIR)/amd64/$(BINARY_NAME)" $(SRC)
 
 build_and_copy:
