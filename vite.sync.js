@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-var-requires */
 /* eslint-disable no-console */
 const Client = require('ssh2-sftp-client');
+const fs = require('node:fs');
 require('dotenv').config();
 
 async function uploadFiles() {
@@ -27,6 +28,14 @@ async function uploadFiles() {
 
     // Set executable permissions
     await sftp.chmod('/jffs/scripts/idefix', '755');
+
+    const goArch = process.env.IDEFIX_GOARCH || 'arm64';
+    const serverBin = `dist/server/${goArch}/idefix-server`;
+    if (fs.existsSync(serverBin)) {
+      await sftp.fastPut(serverBin, '/opt/share/idefix/idefix-server');
+      await sftp.chmod('/opt/share/idefix/idefix-server', '755');
+      console.log('idefix-server uploaded.');
+    }
 
     console.log('Files uploaded and permissions set successfully.');
   } catch (err) {

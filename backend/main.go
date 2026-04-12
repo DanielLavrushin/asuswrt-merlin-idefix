@@ -19,6 +19,7 @@ import (
 	"os/exec"
 	"strconv"
 	"time"
+	_ "time/tzdata"
 
 	"github.com/coder/websocket"
 	"github.com/creack/pty"
@@ -52,6 +53,7 @@ func main() {
 	flag.IntVar(&port, "port", 8787, "listen port")
 	flag.Parse()
 
+	initTZ()
 	setupLogging()
 
 	const sec_path = "/jffs/addons/idefix/sec.key"

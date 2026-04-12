@@ -2,11 +2,30 @@
 package main
 
 import (
+	"bytes"
 	"io"
 	"log"
 	"log/syslog"
 	"os"
+	"time"
 )
+
+func initTZ() {
+	if os.Getenv("TZ") == "" {
+		if raw, err := os.ReadFile("/etc/TZ"); err == nil {
+			tz := string(bytes.TrimSpace(raw))
+			if tz != "" {
+				os.Setenv("TZ", tz)
+			}
+		}
+	}
+	tz := os.Getenv("TZ")
+	if loc, err := time.LoadLocation(tz); err == nil {
+		time.Local = loc
+	} else {
+		log.Printf("could not load timezone %q, leaving time.Local unchanged: %v", tz, err)
+	}
+}
 
 var Syslog *syslog.Writer
 
