@@ -1,9 +1,11 @@
-import { useState, useCallback } from 'react';
-import { Box, IconButton } from '@mui/material';
+import { useState, useCallback, useRef, useEffect } from 'react';
+import { Box, IconButton, Tooltip } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import CloseIcon from '@mui/icons-material/Close';
+import ClearAllIcon from '@mui/icons-material/ClearAll';
 import TerminalIcon from '@mui/icons-material/Terminal';
-import IdefixTerminal from './IdefixTerminal';
+import IdefixTerminal, { TerminalHandle } from './IdefixTerminal';
+import CommandPalette, { CommandPaletteButton } from './CommandPalette';
 
 interface TabSession {
   id: string;
@@ -19,6 +21,19 @@ function genId() {
 export default function TerminalTabs() {
   const [tabs, setTabs] = useState<TabSession[]>([{ id: genId(), num: 1 }]);
   const [activeId, setActiveId] = useState(tabs[0].id);
+  const termRefs = useRef<Map<string, TerminalHandle>>(new Map());
+  const [paletteOpen, setPaletteOpen] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        setPaletteOpen((p) => !p);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const findNextNum = (existing: TabSession[]) => {
     const used = new Set(existing.map((t) => t.num));
@@ -136,6 +151,24 @@ export default function TerminalTabs() {
         >
           <AddIcon sx={{ fontSize: 18 }} />
         </IconButton>
+
+        <Box sx={{ ml: 'auto', mr: 0.5, display: 'flex', alignItems: 'center', gap: 0.25 }}>
+          <Tooltip title="Clear terminal" placement="bottom">
+            <IconButton
+              size="small"
+              onClick={() => termRefs.current.get(activeId)?.clear()}
+              sx={{
+                color: '#888',
+                width: 28,
+                height: 28,
+                '&:hover': { color: '#FFCC00', bgcolor: 'rgba(255,255,255,0.05)' }
+              }}
+            >
+              <ClearAllIcon sx={{ fontSize: 18 }} />
+            </IconButton>
+          </Tooltip>
+          <CommandPaletteButton onClick={() => setPaletteOpen(true)} />
+        </Box>
       </Box>
 
       {/* Terminal panels */}
@@ -154,11 +187,25 @@ export default function TerminalTabs() {
                 pointerEvents: isActive ? 'auto' : 'none'
               }}
             >
-              <IdefixTerminal />
+              <IdefixTerminal
+                ref={(handle) => {
+                  if (handle) termRefs.current.set(t.id, handle);
+                  else termRefs.current.delete(t.id);
+                }}
+              />
             </Box>
           );
         })}
       </Box>
+
+      <CommandPalette
+        open={paletteOpen}
+        onClose={() => setPaletteOpen(false)}
+        onSelect={(cmd) => {
+          const handle = termRefs.current.get(activeId);
+          handle?.sendCommand(cmd);
+        }}
+      />
     </Box>
   );
 }
