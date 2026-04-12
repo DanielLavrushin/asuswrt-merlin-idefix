@@ -291,13 +291,10 @@ remove_loading_progress() {
 }
 
 cleanup_stale_asdfiles() {
-    # Purge orphaned idefix staging files and any asd backups
     local asdbk="/jffs/.asdbk"
-
-    rm -f /tmp/${ADDON_TAG}* 2>/dev/null
 
     if [ -d "$asdbk" ]; then
         rm -f "$asdbk"/${ADDON_TAG}* "$asdbk"/*${ADDON_TAG}* 2>/dev/null
+        find "$asdbk" -maxdepth 1 -name "*${ADDON_TAG}*" -exec rm -f {} \; 2>/dev/null
     fi
-
 }

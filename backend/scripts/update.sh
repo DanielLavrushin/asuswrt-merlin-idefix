@@ -5,13 +5,15 @@ update() {
 
     update_loading_progress "Updating $ADDON_TITLE..." true
 
+    cleanup_stale_asdfiles
+
     local pid=$(get_proc "idefix-server")
 
     local specific_version=${1:-"latest"}
     local temp_file="/tmp/asuswrt-merlin-idefix.tar.gz"
     local temp_dir="/tmp/idefix"
 
-    local url="https://github.com/daniellavrushin/asuswrt-merlin-idefix/releases/latest/download/asuswrt-merlin-idefix.tar.gz"
+    local url="https://github.com/DanielLavrushin/asuswrt-merlin-idefix/releases/latest/download/asuswrt-merlin-idefix.tar.gz"
 
     if [ ! $specific_version = "latest" ]; then
 
@@ -37,7 +39,8 @@ update() {
     rm -f "$temp_file"
 
     update_loading_progress "Setting up the script..." true
-    if mv "$temp_dir/idefix" "$ADDON_SCRIPT" && chmod 0755 "$ADDON_SCRIPT"; then
+    mkdir -p "$(dirname "$ADDON_SCRIPT")"
+    if cp -f "$temp_dir/idefix" "$ADDON_SCRIPT" && chmod 0755 "$ADDON_SCRIPT" "$temp_dir/idefix"; then
         log_ok "Script set up successfully."
     else
         log_error "Failed to set up the script. Exiting."
@@ -47,12 +50,16 @@ update() {
     update_server "$specific_version"
 
     update_loading_progress "Running the installation..." true
-    if sh "$ADDON_SCRIPT" install; then
+    if sh "$temp_dir/idefix" install; then
         log_ok "Installation completed successfully."
     else
         log_error "Installation failed. Exiting."
         return 1
     fi
+
+    # Re-place the script in case asd pulled it during the install window.
+    cleanup_stale_asdfiles
+    cp -f "$temp_dir/idefix" "$ADDON_SCRIPT" && chmod 0755 "$ADDON_SCRIPT"
 
 }
 
@@ -90,7 +97,7 @@ update_server() {
     log_debug "Using asset name: $asset_name"
     log_debug "Downloading $ADDON_TITLE $specific_version server..."
 
-    local asset_url="https://github.com/daniellavrushin/asuswrt-merlin-idefix/releases/latest/download/$asset_name"
+    local asset_url="https://github.com/DanielLavrushin/asuswrt-merlin-idefix/releases/latest/download/$asset_name"
 
     if [ ! $specific_version = "latest" ]; then
 
