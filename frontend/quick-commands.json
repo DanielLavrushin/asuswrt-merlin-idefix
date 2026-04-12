@@ -38,11 +38,9 @@
   { "label": "Top connections by IP", "cmd": "cat /proc/net/nf_conntrack | awk '{for(i=1;i<=NF;i++) if($i~/^src=/) print $i}' | sort | uniq -c | sort -rn | head -15", "category": "Network" },
   { "label": "Bandwidth (live)", "cmd": "watch -n1 'cat /proc/net/dev | grep -E \"eth|br|vlan\"'", "category": "Network" },
 
-  { "label": "WiFi clients (2.4GHz)", "cmd": "wl -i wl0 assoclist 2>/dev/null || echo 'Interface not found'", "category": "WiFi" },
-  { "label": "WiFi clients (5GHz)", "cmd": "wl -i wl1 assoclist 2>/dev/null || echo 'Interface not found'", "category": "WiFi" },
-  { "label": "WiFi channel info (2.4GHz)", "cmd": "wl -i wl0 status 2>/dev/null | head -5 || echo 'Interface not found'", "category": "WiFi" },
-  { "label": "WiFi channel info (5GHz)", "cmd": "wl -i wl1 status 2>/dev/null | head -5 || echo 'Interface not found'", "category": "WiFi" },
-  { "label": "WiFi neighbor scan", "cmd": "wl -i wl1 scan; sleep 2; wl -i wl1 scanresults | grep -E 'SSID|RSSI|Channel' | head -45", "category": "WiFi" },
+  { "label": "WiFi clients (all bands)", "cmd": "for iface in eth1 eth2 eth3 eth4 eth5 eth6 eth7 wl0 wl1 wl0.1 wl1.1; do list=$(wl -i $iface assoclist 2>/dev/null) && [ -n \"$list\" ] && echo \"=== $iface ===\" && echo \"$list\"; done", "category": "WiFi" },
+  { "label": "WiFi interface status", "cmd": "for iface in eth1 eth2 eth3 eth4 eth5 eth6 eth7 wl0 wl1; do s=$(wl -i $iface status 2>/dev/null) && [ -n \"$s\" ] && echo \"=== $iface ===\" && echo \"$s\" | head -5 && echo; done", "category": "WiFi" },
+  { "label": "WiFi interfaces list", "cmd": "nvram show 2>/dev/null | grep -E '^wl[0-9]_ifname='", "category": "WiFi" },
 
   { "label": "Firewall rules (filter)", "cmd": "iptables -L -n --line-numbers | head -80", "category": "Firewall" },
   { "label": "NAT rules", "cmd": "iptables -t nat -L -n --line-numbers | head -80", "category": "Firewall" },
@@ -60,7 +58,7 @@
 
   { "label": "Entware packages", "cmd": "opkg list-installed", "category": "Entware" },
   { "label": "Entware update", "cmd": "opkg update", "category": "Entware" },
-  { "label": "Entware disk usage", "cmd": "du -sh /opt/ 2>/dev/null && echo '---' && du -sh /opt/*/ 2>/dev/null | sort -rh | head -10", "category": "Entware" },
+  { "label": "Entware disk usage", "cmd": "du -sh /opt/ 2>/dev/null && echo '---' && du -sk /opt/*/ 2>/dev/null | sort -rn | head -10", "category": "Entware" },
 
   { "label": "Crontab list", "cmd": "cru l", "category": "Scheduled Tasks" },
   { "label": "User scripts list", "cmd": "ls -la /jffs/scripts/", "category": "Scheduled Tasks" },
