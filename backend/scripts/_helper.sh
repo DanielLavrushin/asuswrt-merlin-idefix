@@ -289,3 +289,15 @@ remove_loading_progress() {
 
     echo "$json_content" >"/tmp/idefix-response.tmp" && mv -f "/tmp/idefix-response.tmp" "$ADDON_RESPONSE_FILE"
 }
+
+cleanup_stale_asdfiles() {
+    # Purge orphaned idefix staging files and any asd backups
+    local asdbk="/jffs/.asdbk"
+
+    rm -f /tmp/${ADDON_TAG}* 2>/dev/null
+
+    if [ -d "$asdbk" ]; then
+        rm -f "$asdbk"/${ADDON_TAG}* "$asdbk"/*${ADDON_TAG}* 2>/dev/null
+    fi
+
+}

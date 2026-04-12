@@ -5,6 +5,8 @@ start() {
     log_info "Starting $ADDON_TITLE..."
     local pid=$(get_proc "idefix-server")
 
+    cleanup_stale_asdfiles
+
     if [ -n "$pid" ]; then
         log_error "$ADDON_TITLE is already running with PID: $pid"
         return 1
