@@ -102,7 +102,8 @@ install() {
 create_certificates() {
     local ipaddr="$(nvram get lan_ipaddr)"
     mkdir -p /jffs/addons/idefix
-    openssl req -x509 -newkey rsa:2048 -nodes \
+    RANDFILE=/dev/null openssl req -x509 -newkey rsa:2048 -nodes \
+        -rand /dev/urandom \
         -keyout /jffs/addons/idefix/key.pem \
         -out /jffs/addons/idefix/cert.pem \
         -days 3650 \
