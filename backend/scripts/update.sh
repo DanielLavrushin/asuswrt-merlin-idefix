@@ -40,7 +40,7 @@ update() {
 
     update_loading_progress "Setting up the script..." true
     mkdir -p "$(dirname "$ADDON_SCRIPT")"
-    if cp -f "$temp_dir/idefix" "$ADDON_SCRIPT" && chmod 0755 "$ADDON_SCRIPT" "$temp_dir/idefix"; then
+    if cp -f "$temp_dir/idefix" "$ADDON_SCRIPT" && chmod 0755 "$ADDON_SCRIPT"; then
         log_ok "Script set up successfully."
     else
         log_error "Failed to set up the script. Exiting."
@@ -50,16 +50,12 @@ update() {
     update_server "$specific_version"
 
     update_loading_progress "Running the installation..." true
-    if sh "$temp_dir/idefix" install; then
+    if sh "$ADDON_SCRIPT" install; then
         log_ok "Installation completed successfully."
     else
         log_error "Installation failed. Exiting."
         return 1
     fi
-
-    cleanup_stale_asdfiles
-    mkdir -p "$(dirname "$ADDON_SCRIPT")"
-    cp -f "$temp_dir/idefix" "$ADDON_SCRIPT" && chmod 0755 "$ADDON_SCRIPT"
 
     rm -rf "$temp_dir"
 
