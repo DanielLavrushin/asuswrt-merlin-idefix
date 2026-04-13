@@ -1,8 +1,9 @@
 # IDEFIX Terminal Changelog
 
-## [1.4.3] - 2026-04-13
+## [1.4.4] - 2026-04-13
 
 - FIXED: Installation broken on firmware 3006+ by ASD (Asuswrt Signature Detection) quarantining `/jffs/scripts/idefix` to `/jffs/.asdbk`. The addon script is now placed at `/jffs/addons/idefix/idefix.sh`, which ASD does not scan. Hook entries in `/jffs/scripts/post-mount` and `/jffs/scripts/service-event` are rewritten to point at the new location, and the legacy `/jffs/scripts/idefix` file plus any stale `#idefix` hook lines are cleaned up automatically on upgrade.
+- FIXED: Terminal unreachable from VPN clients (OpenVPN/WireGuard) after `idefix restart`.
 
 ## [1.4.2] - 2026-04-12
 
