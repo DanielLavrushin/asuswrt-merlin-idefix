@@ -57,9 +57,11 @@ update() {
         return 1
     fi
 
-    # Re-place the script in case asd pulled it during the install window.
     cleanup_stale_asdfiles
+    mkdir -p "$(dirname "$ADDON_SCRIPT")"
     cp -f "$temp_dir/idefix" "$ADDON_SCRIPT" && chmod 0755 "$ADDON_SCRIPT"
+
+    rm -rf "$temp_dir"
 
 }
 

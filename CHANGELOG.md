@@ -1,5 +1,9 @@
 # IDEFIX Terminal Changelog
 
+## [1.4.3] - 2026-04-13
+
+- FIXED: Installation broken on firmware 3006+ by ASD (Asuswrt Signature Detection) quarantining `/jffs/scripts/idefix` to `/jffs/.asdbk`. The addon script is now placed at `/jffs/addons/idefix/idefix.sh`, which ASD does not scan. Hook entries in `/jffs/scripts/post-mount` and `/jffs/scripts/service-event` are rewritten to point at the new location, and the legacy `/jffs/scripts/idefix` file plus any stale `#idefix` hook lines are cleaned up automatically on upgrade.
+
 ## [1.4.2] - 2026-04-12
 
 - ADDED: **Quick Commands palette** — press `Ctrl+K` or click the command button in the tab bar to open a searchable list of common router commands (logs, network, WiFi, VPN, firewall, NVRAM, Entware, and more). Commands are organized by category and can be filtered by typing.
