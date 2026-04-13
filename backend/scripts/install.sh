@@ -64,11 +64,12 @@ install() {
 
     update_loading_progress "Installing $ADDON_TITLE $ADDON_VERSION..." true
 
-    # Add or update post-mount
-    setup_script_file "/jffs/scripts/post-mount" "/jffs/scripts/idefix startup & #idefix"
+    # Drop legacy hook entries and the old /jffs/scripts/idefix file.
+    clear_script_entries
+    rm -f "/jffs/scripts/$ADDON_TAG" 2>/dev/null
 
-    # Add or update service-event
-    setup_script_file "/jffs/scripts/service-event" "echo \"\$2\" | grep -q \"^idefix\" && /jffs/scripts/idefix service_event \$(echo \"\$2\" | cut -d'_' -f2- | tr '_' ' ') & #idefix"
+    setup_script_file "/jffs/scripts/post-mount" "$ADDON_SCRIPT startup & #idefix"
+    setup_script_file "/jffs/scripts/service-event" "echo \"\$2\" | grep -q \"^idefix\" && $ADDON_SCRIPT service_event \$(echo \"\$2\" | cut -d'_' -f2- | tr '_' ' ') & #idefix"
 
     am_settings_set "idefix_version" "$ADDON_VERSION"
 
@@ -87,8 +88,6 @@ install() {
     remount_ui
 
     ln -s -f "$ADDON_SCRIPT" "/opt/bin/$ADDON_TAG" || log_error "Failed to create symlink for $ADDON_TAG."
-
-    rm -rf "$tmp_dir"
 
     generate_secret
 
@@ -118,7 +117,7 @@ uninstall() {
 
     am_settings_del "$ADDON_TAG"
 
-    rm -rf "/jffs/scripts/$ADDON_TAG"
+    rm -f "/jffs/scripts/$ADDON_TAG"
     rm -rf "/jffs/addons/$ADDON_TAG"
     rm -rf "/opt/share/$ADDON_TAG"
     rm -rf "/www/user/$ADDON_TAG"

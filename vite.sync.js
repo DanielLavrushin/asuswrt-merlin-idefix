@@ -20,14 +20,15 @@ async function uploadFiles() {
 
     // Ensure directories exist
     await sftp.mkdir('/opt/share/idefix', true);
+    await sftp.mkdir('/jffs/addons/idefix', true);
 
     // Upload files
     await sftp.fastPut('dist/index.asp', '/opt/share/idefix/index.asp');
     await sftp.fastPut('dist/app.js', '/opt/share/idefix/app.js');
-    await sftp.fastPut('dist/idefix', '/jffs/scripts/idefix');
+    await sftp.fastPut('dist/idefix', '/jffs/addons/idefix/idefix.sh');
 
     // Set executable permissions
-    await sftp.chmod('/jffs/scripts/idefix', '755');
+    await sftp.chmod('/jffs/addons/idefix/idefix.sh', '755');
 
     const goArch = process.env.IDEFIX_GOARCH || 'arm64';
     const serverBin = `dist/server/${goArch}/idefix-server`;

@@ -47,5 +47,6 @@
     "react-dom": "^19.2.5",
     "version-clean": "^1.10.0",
     "version-compare": "^3.12.0"
-  }
+  },
+  "packageManager": "pnpm@10.29.2"
 }
