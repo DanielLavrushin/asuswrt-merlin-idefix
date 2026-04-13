@@ -7,7 +7,7 @@
 
 # IDEFIX Terminal for ASUSWRT-Merlin
 
-![image](https://github.com/user-attachments/assets/d535a0da-0d06-44a1-ba3a-7a7c21e84a72)
+<img width="1004" height="679" alt="image" src="https://github.com/user-attachments/assets/607faea7-8bc3-4ac3-bd84-e3f038c7141b" />
 
 A self-contained terminal that plugs straight into the *Merlin* Web UI.
 
