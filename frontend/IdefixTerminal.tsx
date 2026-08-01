@@ -47,10 +47,7 @@ export const IdefixTerminal = forwardRef<TerminalHandle, TerminalProps>(({ onSta
   const [phase, setPhase] = useState<Phase>('connecting');
   const [wide, setWide] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
-  const toggleWide = () => {
-    setWide((p) => !p);
-    requestAnimationFrame(fitAndResize);
-  };
+  const toggleWide = () => setWide((p) => !p);
 
   const statusCbRef = useRef(onStatusChange);
   statusCbRef.current = onStatusChange;
@@ -110,7 +107,9 @@ export const IdefixTerminal = forwardRef<TerminalHandle, TerminalProps>(({ onSta
     const term = termRef.current;
     const fit = fitAddonRef.current;
     const sock = socketRef.current;
-    if (!term || !fit) return;
+    const host = terminalRef.current;
+    if (!term || !fit || !host) return;
+    if (host.clientWidth === 0 || host.clientHeight === 0) return;
 
     fit.fit();
     if (sock && sock.readyState === WebSocket.OPEN) {
@@ -124,17 +123,20 @@ export const IdefixTerminal = forwardRef<TerminalHandle, TerminalProps>(({ onSta
   };
 
   useEffect(() => {
-    const node = wrapperRef.current;
-    if (!node) return;
+    const node = terminalRef.current;
+    if (!node || typeof ResizeObserver === 'undefined') return;
 
-    const onTransitionEnd = (e: TransitionEvent) => {
-      if (e.propertyName === 'width' || e.propertyName === 'height') {
-        requestAnimationFrame(fitAndResize);
-      }
+    let frame = 0;
+    const observer = new ResizeObserver(() => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(fitAndResize);
+    });
+
+    observer.observe(node);
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
     };
-
-    node.addEventListener('transitionend', onTransitionEnd);
-    return () => node.removeEventListener('transitionend', onTransitionEnd);
   }, []);
 
   const socketAlive = () => {
@@ -329,10 +331,10 @@ export const IdefixTerminal = forwardRef<TerminalHandle, TerminalProps>(({ onSta
           inset: wide ? 0 : 'auto',
           m: wide ? 'auto' : 0,
           width: wide ? '70vw' : '100%',
-          height: wide ? '80vh' : 'auto',
+          height: wide ? '80vh' : '100%',
           zIndex: wide ? 1300 : 'auto',
-          minHeight: '80vh',
-          transition: 'height .25s cubic-bezier(.4,0,.2,1), width .25s cubic-bezier(.4,0,.2,1)'
+          minHeight: 0,
+          overflow: 'hidden'
         }}
       >
         <Stack direction="row" spacing={0.5} sx={{ position: 'absolute', top: 6, right: 4, zIndex: 1301 }}>
@@ -366,7 +368,7 @@ export const IdefixTerminal = forwardRef<TerminalHandle, TerminalProps>(({ onSta
           </Tooltip>
         </Stack>
 
-        <Box ref={terminalRef} sx={{ flex: 1, p: 0.2 }} />
+        <Box ref={terminalRef} sx={{ flex: 1, minHeight: 0, overflow: 'hidden', p: 0.2 }} />
         {showOverlay && (
           <Backdrop
             open={showOverlay}
