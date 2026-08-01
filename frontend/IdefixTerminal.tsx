@@ -6,7 +6,7 @@ import { FitAddon } from '@xterm/addon-fit';
 import { AttachAddon } from '@xterm/addon-attach';
 
 import { Backdrop, Box, Button, CircularProgress, IconButton, Stack, Tooltip, Typography } from '@mui/material';
-import engine, { EngineToken, SubmitActions } from './modules/Engine';
+import engine, { SubmitActions } from './modules/Engine';
 import CloseFullscreenIcon from '@mui/icons-material/CloseFullscreen';
 import OpenInFullIcon from '@mui/icons-material/OpenInFull';
 import SaveAltIcon from '@mui/icons-material/SaveAlt';
@@ -21,9 +21,30 @@ export interface TerminalProps {
   onStatusChange?: (s: 'connected' | 'reconnecting' | 'offline') => void;
 }
 
+type Phase = 'connected' | 'connecting' | 'offline';
+
 const protocol = 'idefix';
 const cols = 0;
 const rows = 0;
+
+/**
+ * Safari tears the socket down with "WebSocket is closed due to suspension"
+ * whenever the page is frozen into the back/forward cache — a tab switch or a
+ * navigation inside the router UI is enough. Every close therefore has to be
+ * treated as recoverable, and the page coming back out of the cache has to
+ * trigger a reconnect on its own (React never remounts in that case).
+ */
+const RECONNECT_DELAYS = [250, 500, 1000, 2000, 4000, 8000];
+
+const newSessionId = (): string => {
+  const bytes = new Uint8Array(16);
+  if (globalThis.crypto?.getRandomValues) {
+    globalThis.crypto.getRandomValues(bytes);
+  } else {
+    for (let i = 0; i < bytes.length; i++) bytes[i] = Math.floor(Math.random() * 256);
+  }
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+};
 
 export const IdefixTerminal = forwardRef<TerminalHandle, TerminalProps>(({ onStatusChange = () => {} }, ref) => {
   const terminalRef = useRef<HTMLDivElement | null>(null);
@@ -31,9 +52,18 @@ export const IdefixTerminal = forwardRef<TerminalHandle, TerminalProps>(({ onSta
   const fitAddonRef = useRef<FitAddon | null>(null);
   const attachAddonRef = useRef<AttachAddon | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
-  const [loading, setLoading] = useState<boolean>(false);
-  const [token, setToken] = useState<EngineToken | undefined>();
-  const report = (s: 'connected' | 'reconnecting' | 'offline') => onStatusChange?.(s);
+  // Identifies this tab's shell on the server so a reconnect resumes it
+  // instead of spawning a new one. Survives back/forward-cache restores.
+  const sessionIdRef = useRef<string>('');
+  if (!sessionIdRef.current) sessionIdRef.current = newSessionId();
+  const retireSocketRef = useRef<(() => void) | null>(null);
+  const retryTimerRef = useRef<number | null>(null);
+  const attemptRef = useRef(0);
+  const connectingRef = useRef(false);
+  const disposedRef = useRef(false);
+  const connectRef = useRef<(restartServer?: boolean) => Promise<void>>(() => Promise.resolve());
+
+  const [phase, setPhase] = useState<Phase>('connecting');
   const [wide, setWide] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const toggleWide = () => {
@@ -41,7 +71,13 @@ export const IdefixTerminal = forwardRef<TerminalHandle, TerminalProps>(({ onSta
     requestAnimationFrame(fitAndResize);
   };
 
-  const [connected, setConnected] = useState<boolean>(true);
+  const statusCbRef = useRef(onStatusChange);
+  statusCbRef.current = onStatusChange;
+
+  const goPhase = useCallback((p: Phase) => {
+    setPhase(p);
+    statusCbRef.current?.(p === 'connecting' ? 'reconnecting' : p);
+  }, []);
 
   useImperativeHandle(ref, () => ({
     sendCommand(cmd: string) {
@@ -107,19 +143,7 @@ export const IdefixTerminal = forwardRef<TerminalHandle, TerminalProps>(({ onSta
     }
   };
 
-  const fetchToken = async () => {
-    setLoading(true);
-    const token = generateToken();
-    await engine.submit(SubmitActions.generateToken, { client_token: token });
-    await engine.getServerToken();
-    setToken(engine.token);
-    setLoading(false);
-  };
-
   useEffect(() => {
-    setConnected(false);
-    fetchToken();
-
     const node = wrapperRef.current;
     if (!node) return;
 
@@ -133,71 +157,126 @@ export const IdefixTerminal = forwardRef<TerminalHandle, TerminalProps>(({ onSta
     return () => node.removeEventListener('transitionend', onTransitionEnd);
   }, []);
 
-  const generateToken = () => {
-    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    let token = '';
-    for (let i = 0; i < 16; i++) {
-      token += characters.charAt(Math.floor(Math.random() * characters.length));
-    }
-    return token;
+  const socketAlive = () => {
+    const sock = socketRef.current;
+    return !!sock && (sock.readyState === WebSocket.OPEN || sock.readyState === WebSocket.CONNECTING);
   };
 
+  const clearRetry = () => {
+    if (retryTimerRef.current !== null) {
+      window.clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = null;
+    }
+  };
+
+  const scheduleReconnect = useCallback(() => {
+    if (disposedRef.current || socketAlive() || retryTimerRef.current !== null) return;
+
+    if (attemptRef.current >= RECONNECT_DELAYS.length) {
+      // Out of automatic retries — the server is probably down, so hand it back
+      // to the user rather than hammering the router.
+      goPhase('offline');
+      return;
+    }
+
+    const delay = RECONNECT_DELAYS[attemptRef.current];
+    attemptRef.current += 1;
+    goPhase('connecting');
+    retryTimerRef.current = window.setTimeout(() => {
+      retryTimerRef.current = null;
+      void connectRef.current();
+    }, delay);
+  }, [goPhase]);
+
   const connectSocket = useCallback(
-    async (shouldStartServer?: boolean) => {
-      if (!engine.token) return;
-      if (!termRef.current) return;
-      if (shouldStartServer) {
-        report('reconnecting');
-        setLoading(true);
-        await engine.submit(SubmitActions.restart);
-        await engine.delay(4000);
-      }
-      attachAddonRef.current?.dispose();
-      socketRef.current?.close();
+    async (shouldStartServer = false) => {
+      if (disposedRef.current || connectingRef.current || !termRef.current) return;
+      if (!shouldStartServer && socketAlive()) return;
 
-      const base = buildEndpoint(window.location.protocol === 'https:');
+      connectingRef.current = true;
+      clearRetry();
+      goPhase('connecting');
 
-      const url = new URL(base, window.location.href);
-      url.searchParams.set('c', engine.token?.cl || '');
-      url.searchParams.set('t', engine.token?.ts?.toFixed() || '');
-      url.searchParams.set('s', engine.token?.sig || '');
-
-      const socket = new WebSocket(url, protocol);
-      socket.binaryType = 'arraybuffer';
-
-      socket.addEventListener('open', () => {
-        setConnected(true);
-        report('connected');
-      });
-
-      socket.addEventListener('close', async () => {
-        const currentToken = engine.token;
-        if (currentToken?.ts && Date.now() - currentToken.ts * 1000 > 115 * 1000) {
-          await fetchToken();
-          connectSocket();
-        } else {
-          setConnected(false);
-          report('offline');
+      try {
+        if (shouldStartServer) {
+          attemptRef.current = 0;
+          await engine.submit(SubmitActions.restart);
+          await engine.delay(4000);
+          if (disposedRef.current) return;
         }
-      });
 
-      socket.addEventListener('error', () => {
-        setConnected(false);
-        report('offline');
-      });
+        if (!engine.isTokenFresh()) {
+          await engine.refreshToken();
+          if (disposedRef.current) return;
+        }
 
-      const attachAddon = new AttachAddon(socket, { bidirectional: true });
-      termRef.current.loadAddon(attachAddon);
+        const token = engine.token;
+        if (!token?.sig) {
+          scheduleReconnect();
+          return;
+        }
 
-      socketRef.current = socket;
-      attachAddonRef.current = attachAddon;
-      setLoading(false);
+        retireSocketRef.current?.();
+
+        const url = new URL(buildEndpoint(window.location.protocol === 'https:'), window.location.href);
+        url.searchParams.set('c', token.cl || '');
+        url.searchParams.set('t', token.ts?.toFixed() || '');
+        url.searchParams.set('s', token.sig);
+        url.searchParams.set('sid', sessionIdRef.current);
+
+        const socket = new WebSocket(url, protocol);
+        socket.binaryType = 'arraybuffer';
+
+        let retired = false;
+        const dropped = () => {
+          if (retired || disposedRef.current || socketRef.current !== socket) return;
+          scheduleReconnect();
+        };
+
+        socket.addEventListener('open', () => {
+          if (retired) return;
+          attemptRef.current = 0;
+          // The server replays this session's scrollback on attach, so wipe the
+          // local screen first — otherwise a resumed session renders twice.
+          termRef.current?.reset();
+          goPhase('connected');
+          fitAndResize();
+        });
+
+        socket.addEventListener('close', dropped);
+        socket.addEventListener('error', dropped);
+
+        const attachAddon = new AttachAddon(socket, { bidirectional: true });
+        termRef.current.loadAddon(attachAddon);
+
+        retireSocketRef.current = () => {
+          retired = true;
+          attachAddon.dispose();
+          if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) {
+            socket.close(1000, 'replaced');
+          }
+          if (socketRef.current === socket) socketRef.current = null;
+          if (attachAddonRef.current === attachAddon) attachAddonRef.current = null;
+        };
+
+        socketRef.current = socket;
+        attachAddonRef.current = attachAddon;
+      } catch (err) {
+        console.error('idefix: connect failed', err);
+        scheduleReconnect();
+      } finally {
+        connectingRef.current = false;
+      }
     },
-    [protocol]
+    [goPhase, scheduleReconnect]
   );
+
+  connectRef.current = connectSocket;
 
   useLayoutEffect(() => {
     if (!terminalRef.current) return;
+    disposedRef.current = false;
+
     const term = new Terminal({
       cursorBlink: true,
       fontFamily: 'Consolas, monospace',
@@ -213,19 +292,56 @@ export const IdefixTerminal = forwardRef<TerminalHandle, TerminalProps>(({ onSta
     termRef.current = term;
     fitAddonRef.current = fitAddon;
 
-    connectSocket();
+    void connectRef.current();
 
     const handleResize = () => fitAndResize();
+
+    // Reconnect as soon as the page is usable again. `pageshow` with
+    // `persisted` is the only notice Safari gives that the page came back out
+    // of the back/forward cache with a dead socket attached to it.
+    const resume = () => {
+      if (disposedRef.current || document.visibilityState === 'hidden' || socketAlive()) return;
+      attemptRef.current = 0;
+      clearRetry();
+      void connectRef.current();
+    };
+    const handlePageShow = (e: PageTransitionEvent) => {
+      if (e.persisted) resume();
+    };
+
     window.addEventListener('resize', handleResize);
+    window.addEventListener('pageshow', handlePageShow);
+    window.addEventListener('focus', resume);
+    window.addEventListener('online', resume);
+    document.addEventListener('visibilitychange', resume);
 
     return () => {
+      disposedRef.current = true;
+      clearRetry();
       window.removeEventListener('resize', handleResize);
-      socketRef.current?.close();
-      term.dispose();
-    };
-  }, [token]);
+      window.removeEventListener('pageshow', handlePageShow);
+      window.removeEventListener('focus', resume);
+      window.removeEventListener('online', resume);
+      document.removeEventListener('visibilitychange', resume);
 
-  const showOverlay = !connected || loading;
+      // Closing the tab is deliberate, so retire the shell now instead of
+      // leaving it to sit out the server's grace period.
+      const sock = socketRef.current;
+      if (sock?.readyState === WebSocket.OPEN) {
+        try {
+          sock.send(JSON.stringify({ type: 'bye' }));
+        } catch {
+          /* going away anyway */
+        }
+      }
+      retireSocketRef.current?.();
+      retireSocketRef.current = null;
+      term.dispose();
+      termRef.current = null;
+    };
+  }, []);
+
+  const showOverlay = phase !== 'connected';
 
   return (
     <>
@@ -289,7 +405,7 @@ export const IdefixTerminal = forwardRef<TerminalHandle, TerminalProps>(({ onSta
         <Box ref={terminalRef} sx={{ flex: 1, p: 0.2 }} />
         {showOverlay && (
           <Backdrop
-            open={!connected}
+            open={showOverlay}
             sx={{
               position: 'absolute',
               zIndex: 1304,
@@ -302,14 +418,14 @@ export const IdefixTerminal = forwardRef<TerminalHandle, TerminalProps>(({ onSta
             }}
             transitionDuration={300}
           >
-            {loading && (
+            {phase === 'connecting' && (
               <Stack spacing={2} alignItems="center">
                 <CircularProgress size={40} thickness={4} />
                 <Typography variant="body2">Connecting…</Typography>
               </Stack>
             )}
-            {!loading && (
-              <Button variant="contained" size="small" onClick={() => connectSocket(true)} sx={{ alignSelf: 'center', mt: 1 }}>
+            {phase === 'offline' && (
+              <Button variant="contained" size="small" onClick={() => void connectSocket(true)} sx={{ alignSelf: 'center', mt: 1 }}>
                 Reconnect
               </Button>
             )}
