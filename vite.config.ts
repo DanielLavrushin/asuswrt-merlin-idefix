@@ -109,15 +109,11 @@ export default defineConfig(({ mode }) => {
             console.log(`Building idefix-server (linux/${goArch})...`);
             const outDir = resolve(__dirname, 'dist', 'server', goArch);
             fs.mkdirSync(outDir, { recursive: true });
-            execFileSync(
-              'go',
-              ['build', '-trimpath', '-ldflags', '-s -w', '-o', join(outDir, 'idefix-server'), './'],
-              {
-                cwd: resolve(__dirname, 'backend'),
-                env: { ...process.env, GOOS: 'linux', GOARCH: goArch },
-                stdio: 'inherit'
-              }
-            );
+            execFileSync('go', ['build', '-trimpath', '-ldflags', '-s -w', '-o', join(outDir, 'idefix-server'), './'], {
+              cwd: resolve(__dirname, 'backend'),
+              env: { ...process.env, GOOS: 'linux', GOARCH: goArch },
+              stdio: 'inherit'
+            });
             console.log('Go backend built.');
           } catch (e) {
             console.error('Go build error:', e);

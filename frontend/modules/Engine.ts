@@ -38,6 +38,7 @@ export interface LoadingBridge {
 }
 
 const TOKEN_MAX_AGE_MS = 100 * 1000;
+const CLOCK_SKEW_TOLERANCE_MS = 30 * 1000;
 
 /**
  * Hex-encoded random identifier. Everything that names a terminal session or
@@ -67,19 +68,20 @@ class Engine {
 
   public isTokenFresh(maxAgeMs: number = TOKEN_MAX_AGE_MS): boolean {
     const ts = this.token?.ts;
-    return !!this.token?.sig && !!ts && Date.now() - ts * 1000 < maxAgeMs;
+    if (!this.token?.sig || !ts) return false;
+
+    const ageMs = Date.now() - ts * 1000;
+    return ageMs > -CLOCK_SKEW_TOLERANCE_MS && ageMs < maxAgeMs;
   }
 
   public refreshToken(): Promise<EngineToken | undefined> {
-    if (!this.tokenRefresh) {
-      this.tokenRefresh = (async () => {
-        await this.submit(SubmitActions.generateToken, { client_token: this.getClientId() });
-        await this.getServerToken();
-        return this.token;
-      })().finally(() => {
-        this.tokenRefresh = null;
-      });
-    }
+    this.tokenRefresh ??= (async () => {
+      await this.submit(SubmitActions.generateToken, { client_token: this.getClientId() });
+      await this.getServerToken();
+      return this.token;
+    })().finally(() => {
+      this.tokenRefresh = null;
+    });
     return this.tokenRefresh;
   }
 
