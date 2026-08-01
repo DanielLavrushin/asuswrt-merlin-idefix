@@ -1,4 +1,3 @@
-// session.go
 package main
 
 import (
@@ -17,20 +16,19 @@ import (
 )
 
 const (
-	// How long a shell is kept alive after its browser disappears. Safari drops
-	// the socket every time the page enters the back/forward cache, so a plain
-	// "kill the shell on disconnect" loses the user's session on a tab switch.
-	sessionGrace = 2 * time.Minute
-	// Recent output replayed to a client when it (re)attaches.
+	sessionGrace   = 2 * time.Minute
 	scrollbackSize = 128 * 1024
 	maxSessions    = 16
 	writeTimeout   = 15 * time.Second
 )
 
+var errNotOwner = errors.New("session belongs to another client")
+
 type session struct {
-	id   string
-	ptmx *os.File
-	proc *exec.Cmd
+	id    string
+	owner string
+	ptmx  *os.File
+	proc  *exec.Cmd
 
 	mu     sync.Mutex
 	conn   *websocket.Conn
@@ -52,8 +50,6 @@ func newSessionID() string {
 	return hex.EncodeToString(b)
 }
 
-// validSessionID keeps caller-supplied ids to a harmless shape before they end
-// up in a map key or the log.
 func validSessionID(id string) bool {
 	if len(id) < 8 || len(id) > 64 {
 		return false
@@ -68,13 +64,14 @@ func validSessionID(id string) bool {
 	return true
 }
 
-// acquireSession returns the shell owning id, starting a fresh one when the id
-// is unknown. The second result reports whether an existing shell was resumed.
-func acquireSession(id string, cols, rows int) (*session, bool, error) {
+func acquireSession(id, owner string, cols, rows int) (*session, bool, error) {
 	sessionsMu.Lock()
 	defer sessionsMu.Unlock()
 
 	if s, ok := sessions[id]; ok {
+		if s.owner != owner {
+			return nil, false, errNotOwner
+		}
 		return s, true, nil
 	}
 	if len(sessions) >= maxSessions {
@@ -86,7 +83,7 @@ func acquireSession(id string, cols, rows int) (*session, bool, error) {
 		return nil, false, err
 	}
 
-	s := &session{id: id, ptmx: ptmx, proc: proc, buf: newRingBuffer(scrollbackSize)}
+	s := &session{id: id, owner: owner, ptmx: ptmx, proc: proc, buf: newRingBuffer(scrollbackSize)}
 	sessions[id] = s
 
 	go s.pump()
@@ -98,9 +95,6 @@ func acquireSession(id string, cols, rows int) (*session, bool, error) {
 	return s, false, nil
 }
 
-// pump drains the pty for the whole life of the shell, whether or not a browser
-// is currently attached — output produced while detached lands in the ring
-// buffer and is replayed on the next attach.
 func (s *session) pump() {
 	chunk := make([]byte, 32*1024)
 	for {
@@ -133,8 +127,6 @@ func (s *session) broadcast(p []byte) {
 	}
 }
 
-// attach hands the session to c, evicting whatever was attached before, and
-// replays the scrollback so a resumed session comes back with its screen.
 func (s *session) attach(c *websocket.Conn) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -219,7 +211,6 @@ func writeFrame(c *websocket.Conn, p []byte) error {
 	return c.Write(ctx, websocket.MessageBinary, p)
 }
 
-// ringBuffer keeps the last N bytes of pty output for replay on reattach.
 type ringBuffer struct {
 	data []byte
 	pos  int

@@ -1,4 +1,3 @@
-// idefix.go
 package main
 
 import (
@@ -9,6 +8,7 @@ import (
 	"crypto/tls"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -43,9 +43,12 @@ func loadCert() (tls.Certificate, error) {
 	return tls.Certificate{}, fmt.Errorf("no certs found")
 }
 
-// maxMessageBytes caps a single inbound frame; generous enough that pasting a
-// script into the terminal doesn't tear the connection down.
 const maxMessageBytes = 1 << 20
+
+const (
+	tokenTTL     = 2 * time.Minute
+	maxClockSkew = 30 * time.Second
+)
 
 var (
 	port   int
@@ -99,13 +102,14 @@ func main() {
 
 func wsHandler(w http.ResponseWriter, r *http.Request) {
 
-	if !authorised(r) {
+	owner, ok := authorised(r)
+	if !ok {
 		log.Printf("unauthorised from %s – c=%q  t=%q", r.RemoteAddr, r.URL.Query().Get("c"), r.URL.Query().Get("t"))
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
 
-	log.Printf("authorised client %s (c=%s)", r.RemoteAddr, r.URL.Query().Get("c"))
+	log.Printf("authorised client %s (c=%s)", r.RemoteAddr, owner)
 
 	c, err := websocket.Accept(w, r, &websocket.AcceptOptions{
 		Subprotocols:       []string{"idefix"},
@@ -117,18 +121,14 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Default is 32 KiB, which turns a large paste into a fatal read error.
 	c.SetReadLimit(maxMessageBytes)
 
 	log.Printf("WS connected (%s)", r.RemoteAddr)
 
-	serveSession(r.Context(), c, r.URL.Query().Get("sid"), r.RemoteAddr)
+	serveSession(r.Context(), c, r.URL.Query().Get("sid"), owner, r.RemoteAddr)
 }
 
-// serveSession attaches c to its shell — resuming an existing one when the
-// client brings back a known session id — and pumps browser input into the pty
-// until the socket drops.
-func serveSession(ctx context.Context, c *websocket.Conn, sid, remote string) {
+func serveSession(ctx context.Context, c *websocket.Conn, sid, owner, remote string) {
 	if !validSessionID(sid) {
 		if sid != "" {
 			log.Printf("ignoring malformed session id from %s", remote)
@@ -136,10 +136,14 @@ func serveSession(ctx context.Context, c *websocket.Conn, sid, remote string) {
 		sid = newSessionID()
 	}
 
-	sess, resumed, err := acquireSession(sid, 80, 24)
+	sess, resumed, err := acquireSession(sid, owner, 80, 24)
 	if err != nil {
 		log.Printf("session error for %s: %v", remote, err)
-		c.Close(websocket.StatusInternalError, err.Error())
+		if errors.Is(err, errNotOwner) {
+			c.Close(websocket.StatusPolicyViolation, "session belongs to another client")
+		} else {
+			c.Close(websocket.StatusInternalError, err.Error())
+		}
 		return
 	}
 
@@ -163,9 +167,6 @@ func serveSession(ctx context.Context, c *websocket.Conn, sid, remote string) {
 	for {
 		msgType, rdr, err := c.Reader(ctx)
 		if err != nil {
-			// A Safari back/forward-cache suspension shows up here as a normal
-			// going-away close; the shell stays alive for sessionGrace so the
-			// client can pick it up again.
 			log.Printf("WS read error (%s, session %s): %v", remote, sid, err)
 			return
 		}
@@ -189,8 +190,6 @@ func serveSession(ctx context.Context, c *websocket.Conn, sid, remote string) {
 					}
 					continue
 				case "bye":
-					// Tab closed on purpose — don't leave the shell waiting out
-					// the grace period.
 					sess.shutdown("client closed session")
 					return
 				}
@@ -202,7 +201,7 @@ func serveSession(ctx context.Context, c *websocket.Conn, sid, remote string) {
 }
 
 func startShell(cols, rows int) (ptmx *os.File, cmd *exec.Cmd, err error) {
-	cmd = exec.Command("/bin/sh") // BusyBox ash on Merlin
+	cmd = exec.Command("/bin/sh")
 	log.Printf("Starting shell: %s", cmd.String())
 	winsz := &pty.Winsize{Cols: uint16(cols), Rows: uint16(rows)}
 	ptmx, err = pty.StartWithSize(cmd, winsz)
@@ -213,23 +212,29 @@ func resizePTY(f *os.File, cols, rows int) {
 	pty.Setsize(f, &pty.Winsize{Cols: uint16(cols), Rows: uint16(rows)})
 }
 
-func authorised(r *http.Request) bool {
+func authorised(r *http.Request) (string, bool) {
 	q := r.URL.Query()
 	c := q.Get("c")
 	s := q.Get("s")
 	t := q.Get("t")
 
 	if c == "" || s == "" || t == "" {
-		return false
+		return "", false
 	}
 
 	ts, err := strconv.ParseInt(t, 10, 64)
 	if err != nil {
-		return false
+		return "", false
 	}
-	if time.Since(time.Unix(ts, 0)) > 2*time.Minute {
-		fmt.Println("token expired")
-		return false
+
+	age := time.Since(time.Unix(ts, 0))
+	if age > tokenTTL {
+		log.Printf("token expired (%s old)", age.Truncate(time.Second))
+		return "", false
+	}
+	if age < -maxClockSkew {
+		log.Printf("token rejected: timestamp %s in the future", (-age).Truncate(time.Second))
+		return "", false
 	}
 
 	mac := hmac.New(sha256.New, secret)
@@ -240,11 +245,11 @@ func authorised(r *http.Request) bool {
 
 	sent, err := hex.DecodeString(s)
 	if err != nil {
-		return false
+		return "", false
 	}
 	if !hmac.Equal(expected, sent) {
-		fmt.Println("bad signature")
-		return false
+		log.Printf("bad signature from %s", r.RemoteAddr)
+		return "", false
 	}
-	return true
+	return c, true
 }

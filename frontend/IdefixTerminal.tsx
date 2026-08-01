@@ -27,13 +27,6 @@ const protocol = 'idefix';
 const cols = 0;
 const rows = 0;
 
-/**
- * Safari tears the socket down with "WebSocket is closed due to suspension"
- * whenever the page is frozen into the back/forward cache — a tab switch or a
- * navigation inside the router UI is enough. Every close therefore has to be
- * treated as recoverable, and the page coming back out of the cache has to
- * trigger a reconnect on its own (React never remounts in that case).
- */
 const RECONNECT_DELAYS = [250, 500, 1000, 2000, 4000, 8000];
 
 const newSessionId = (): string => {
@@ -52,8 +45,6 @@ export const IdefixTerminal = forwardRef<TerminalHandle, TerminalProps>(({ onSta
   const fitAddonRef = useRef<FitAddon | null>(null);
   const attachAddonRef = useRef<AttachAddon | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
-  // Identifies this tab's shell on the server so a reconnect resumes it
-  // instead of spawning a new one. Survives back/forward-cache restores.
   const sessionIdRef = useRef<string>('');
   if (!sessionIdRef.current) sessionIdRef.current = newSessionId();
   const retireSocketRef = useRef<(() => void) | null>(null);
@@ -95,7 +86,6 @@ export const IdefixTerminal = forwardRef<TerminalHandle, TerminalProps>(({ onSta
         const line = buf.getLine(i);
         if (line) lines.push(line.translateToString(true));
       }
-      // trim trailing empty lines
       while (lines.length > 0 && lines[lines.length - 1].trim() === '') lines.pop();
       return lines.join('\n');
     },
@@ -173,8 +163,6 @@ export const IdefixTerminal = forwardRef<TerminalHandle, TerminalProps>(({ onSta
     if (disposedRef.current || socketAlive() || retryTimerRef.current !== null) return;
 
     if (attemptRef.current >= RECONNECT_DELAYS.length) {
-      // Out of automatic retries — the server is probably down, so hand it back
-      // to the user rather than hammering the router.
       goPhase('offline');
       return;
     }
@@ -236,8 +224,6 @@ export const IdefixTerminal = forwardRef<TerminalHandle, TerminalProps>(({ onSta
         socket.addEventListener('open', () => {
           if (retired) return;
           attemptRef.current = 0;
-          // The server replays this session's scrollback on attach, so wipe the
-          // local screen first — otherwise a resumed session renders twice.
           termRef.current?.reset();
           goPhase('connected');
           fitAndResize();
@@ -296,9 +282,6 @@ export const IdefixTerminal = forwardRef<TerminalHandle, TerminalProps>(({ onSta
 
     const handleResize = () => fitAndResize();
 
-    // Reconnect as soon as the page is usable again. `pageshow` with
-    // `persisted` is the only notice Safari gives that the page came back out
-    // of the back/forward cache with a dead socket attached to it.
     const resume = () => {
       if (disposedRef.current || document.visibilityState === 'hidden' || socketAlive()) return;
       attemptRef.current = 0;
@@ -324,15 +307,11 @@ export const IdefixTerminal = forwardRef<TerminalHandle, TerminalProps>(({ onSta
       window.removeEventListener('online', resume);
       document.removeEventListener('visibilitychange', resume);
 
-      // Closing the tab is deliberate, so retire the shell now instead of
-      // leaving it to sit out the server's grace period.
       const sock = socketRef.current;
       if (sock?.readyState === WebSocket.OPEN) {
         try {
           sock.send(JSON.stringify({ type: 'bye' }));
-        } catch {
-          /* going away anyway */
-        }
+        } catch {}
       }
       retireSocketRef.current?.();
       retireSocketRef.current = null;

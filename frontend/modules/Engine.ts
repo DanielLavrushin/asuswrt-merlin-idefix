@@ -1,11 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-call */
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable security/detect-object-injection */
-/* eslint-disable @typescript-eslint/no-unused-vars */
-/* eslint-disable no-unused-vars */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
-/* eslint-disable @typescript-eslint/no-unsafe-return */
-/* eslint-disable @typescript-eslint/no-misused-promises */
 import axios from 'axios';
 import { useLoadingBridge } from './LoadingBridge';
 
@@ -27,7 +19,6 @@ class EngineResponseConfig {
   public loading?: EngineLoadingProgress;
 }
 
-/* eslint-disable @typescript-eslint/no-unused-vars */
 export enum SubmitActions {
   restart = 'idefix_restart',
   generateToken = 'idefix_generate_token',
@@ -46,27 +37,27 @@ export interface LoadingBridge {
   stop: () => void;
 }
 
-// The server rejects tokens older than 2 minutes; refresh a bit before that.
 const TOKEN_MAX_AGE_MS = 100 * 1000;
 
 class Engine {
   public token: EngineToken | undefined;
   private tokenRefresh: Promise<EngineToken | undefined> | null = null;
+  private clientId: string | undefined;
+
+  public getClientId(): string {
+    this.clientId ??= this.generateClientToken();
+    return this.clientId;
+  }
 
   public isTokenFresh(maxAgeMs: number = TOKEN_MAX_AGE_MS): boolean {
     const ts = this.token?.ts;
     return !!this.token?.sig && !!ts && Date.now() - ts * 1000 < maxAgeMs;
   }
 
-  /**
-   * Mints a fresh signed token. Every terminal tab shares `engine.token`, so
-   * concurrent callers are folded into a single round trip — `submit` writes to
-   * the shared `window.idefix.custom_settings`, which must not interleave.
-   */
   public refreshToken(): Promise<EngineToken | undefined> {
     if (!this.tokenRefresh) {
       this.tokenRefresh = (async () => {
-        await this.submit(SubmitActions.generateToken, { client_token: this.generateClientToken() });
+        await this.submit(SubmitActions.generateToken, { client_token: this.getClientId() });
         await this.getServerToken();
         return this.token;
       })().finally(() => {
@@ -214,14 +205,14 @@ class Engine {
       onDone: bridge.stop
     });
 
-  if (windowReload) {
+    if (windowReload) {
       setTimeout(() => {
         window.location.href = window.location.pathname + '?updated=' + Date.now();
       }, 500);
     }
   }
 
- checkLoadingProgress(opts: { onUpdate: (msg?: string, progress?: number) => void; onDone: () => void }): Promise<void> {
+  checkLoadingProgress(opts: { onUpdate: (msg?: string, progress?: number) => void; onDone: () => void }): Promise<void> {
     return new Promise((resolve) => {
       let seenProgress = false;
       const timer = setInterval(async () => {
@@ -242,9 +233,7 @@ class Engine {
             opts.onDone();
             resolve();
           }
-        } catch {
-          // Network error during update, keep polling
-        }
+        } catch {}
       }, 500);
     });
   }

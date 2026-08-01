@@ -73,22 +73,32 @@ func sessionServer(t *testing.T) *httptest.Server {
 			return
 		}
 		c.SetReadLimit(maxMessageBytes)
-		serveSession(r.Context(), c, r.URL.Query().Get("sid"), r.RemoteAddr)
+		serveSession(r.Context(), c, r.URL.Query().Get("sid"), r.URL.Query().Get("owner"), r.RemoteAddr)
 	}))
 }
 
+const testOwner = "test-client-token"
+
 func dial(t *testing.T, srv *httptest.Server, sid string) *websocket.Conn {
 	t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	url := "ws" + strings.TrimPrefix(srv.URL, "http") + "/ws?sid=" + sid
-	c, _, err := websocket.Dial(ctx, url, &websocket.DialOptions{Subprotocols: []string{"idefix"}})
+	c, err := dialAs(srv, sid, testOwner)
 	if err != nil {
 		t.Fatalf("dial: %v", err)
 	}
-	c.SetReadLimit(maxMessageBytes)
 	return c
+}
+
+func dialAs(srv *httptest.Server, sid, owner string) (*websocket.Conn, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	url := "ws" + strings.TrimPrefix(srv.URL, "http") + "/ws?sid=" + sid + "&owner=" + owner
+	c, _, err := websocket.Dial(ctx, url, &websocket.DialOptions{Subprotocols: []string{"idefix"}})
+	if err != nil {
+		return nil, err
+	}
+	c.SetReadLimit(maxMessageBytes)
+	return c, nil
 }
 
 // readUntil accumulates pty output until it contains want, or the deadline hits.
@@ -219,6 +229,38 @@ func TestLargePasteDoesNotKillSession(t *testing.T) {
 	send(t, c, "echo survived-the-paste\n")
 
 	readUntil(t, c, "survived-the-paste", 15*time.Second)
+}
+
+// TestSessionIDIsNotACapability: knowing another client's session id is not
+// enough to attach to its shell.
+func TestSessionIDIsNotACapability(t *testing.T) {
+	srv := sessionServer(t)
+	defer srv.Close()
+
+	const sid = "victim-session-01"
+
+	victim := dial(t, srv, sid)
+	defer victim.Close(websocket.StatusNormalClosure, "")
+	send(t, victim, "echo victim-ready\n")
+	readUntil(t, victim, "victim-ready", 10*time.Second)
+
+	attacker, err := dialAs(srv, sid, "some-other-client")
+	if err != nil {
+		t.Fatalf("dial: %v", err)
+	}
+	defer attacker.Close(websocket.StatusNormalClosure, "")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if _, _, err := attacker.Reader(ctx); err == nil {
+		t.Fatal("expected the attach to be refused")
+	} else if !strings.Contains(err.Error(), "belongs to another client") {
+		t.Fatalf("refused for the wrong reason: %v", err)
+	}
+
+	// The victim's shell is untouched.
+	send(t, victim, "echo victim-still-here\n")
+	readUntil(t, victim, "victim-still-here", 10*time.Second)
 }
 
 // TestNewSessionIDPerClient: two clients without a usable id get their own shells.

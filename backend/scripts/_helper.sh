@@ -63,11 +63,13 @@ printlog() {
         ;;
     esac
 
-    logger -t "IDEFIX" -p "${LOG_FACILITY}.${priority}" -- "$msg"
-
+    # Checked before logger, not after: a suppressed DEBUG line must not reach
+    # syslog either, or "debug off" only hides it from the console.
     if [ "$ADDON_DEBUG" = "false" ] && [ "$level" = "DEBUG" ]; then
         return
     fi
+
+    logger -t "IDEFIX" -p "${LOG_FACILITY}.${priority}" -- "$msg"
 
     if [ "$USE_COLOR" -eq 1 ]; then
         printf '%b%s%b\n' "$color" "$msg" "$CRESET"
