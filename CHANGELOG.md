@@ -21,6 +21,7 @@
 - SECURITY: A terminal session can now only be resumed by the browser that opened it; a session identifier is no longer sufficient on its own.
 - SECURITY: Tokens dated in the future are now rejected. Previously a token minted while the router's clock ran ahead of NTP would never expire.
 - SECURITY: The client identifier supplied by the browser is now validated before it is signed and written into `token.json`.
+- SECURITY: **GitHub release notes were rendered as unsanitized HTML** ([#17](https://github.com/DanielLavrushin/asuswrt-merlin-idefix/issues/17)). The version dialog fetched the latest release description from GitHub, ran it through a Markdown renderer and inserted the result straight into the page. Markdown permits inline HTML, and the renderer neither strips it nor filters link protocols, so anything in a release body — `<img src=x onerror=…>`, a `javascript:` link — would have executed inside the router's administration page. The rendered notes are now sanitized against a tag and attribute allowlist, URLs are restricted to `http`/`https`, and links open in a new tab with `rel="noopener noreferrer"`. Reaching this required control of the project's GitHub releases, which is also the channel the **Update now** button installs from, so the practical exposure was limited; it is fixed regardless.
 
 ## [1.4.5] - 2026-04-13
 
