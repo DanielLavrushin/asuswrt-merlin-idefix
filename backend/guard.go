@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-var defaultAllowedIfaces = []string{"lo", "br+", "tun+", "tap+", "wg+"}
+var defaultAllowedIfaces = []string{"lo", "br+", "tun+", "wg+"}
 
 const ifaceCacheTTL = 15 * time.Second
 

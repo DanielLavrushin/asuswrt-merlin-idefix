@@ -337,10 +337,10 @@ unset IDEFIX_ALLOW_IFACES
 # A failed ACCEPT only ever removes permission, so it is tolerated on purpose:
 # the port stays shut and the remaining interfaces keep working.
 reset_store
-IPT_FAIL_MATCH='-i tap+'
+IPT_FAIL_MATCH='-i tun+'
 firewall_add_rules >/dev/null 2>&1
 check "a failed ACCEPT does not stop the addon" "$?" "0"
-check "the failed ACCEPT is simply absent" "$(count "$V4" '\-i tap+')" "0"
+check "the failed ACCEPT is simply absent" "$(count "$V4" '\-i tun+')" "0"
 check "the other interfaces are still accepted" "$(count "$V4" '\-i br+ -p tcp --dport 8787 -j ACCEPT')" "1"
 check "the catch-all DROP is still in place" "$(count "$V4" '^-p tcp --dport 8787 -j DROP$')" "1"
 IPT_FAIL_MATCH=""

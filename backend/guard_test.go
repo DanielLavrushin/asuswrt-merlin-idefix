@@ -206,7 +206,7 @@ func TestAllowedIfacePatternsRejectsMatchAnything(t *testing.T) {
 		}
 	}
 
-	if _, used := allowedIfacePatterns("lo br+ tun+ tap+ wg+"); !used {
+	if _, used := allowedIfacePatterns("lo br+ tun+ wg+"); !used {
 		t.Error("the default interface list was rejected as malformed")
 	}
 }
@@ -228,8 +228,8 @@ func TestIfaceAllowed(t *testing.T) {
 		"br0":        true,
 		"br1":        true,
 		"tun21":      true,
-		"tap11":      true,
 		"wgs1":       true,
+		"tap11":      false,
 		"eth0":       false,
 		"vlan2":      false,
 		"ppp0":       false,

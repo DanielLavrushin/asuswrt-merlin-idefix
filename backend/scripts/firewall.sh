@@ -20,13 +20,12 @@
 #   lo    loopback
 #   br+   LAN bridge and guest-network bridges (br0, br1, …)
 #   tun+  OpenVPN server and client tunnels
-#   tap+  OpenVPN bridged tunnels
 #   wg+   WireGuard server and client tunnels
 #
 # IDEFIX_ALLOW_IFACES overrides the list for anyone running the terminal over
 # another private overlay (Tailscale, ZeroTier). The same variable is honoured
 # by the server binary. Never add a WAN interface to it.
-FIREWALL_DEFAULT_IFACES="lo br+ tun+ tap+ wg+"
+FIREWALL_DEFAULT_IFACES="lo br+ tun+ wg+"
 
 firewall_allowed_ifaces() {
     local ifaces="${IDEFIX_ALLOW_IFACES:-$FIREWALL_DEFAULT_IFACES}"
