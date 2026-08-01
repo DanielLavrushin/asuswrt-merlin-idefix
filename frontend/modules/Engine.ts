@@ -1,11 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-call */
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable security/detect-object-injection */
-/* eslint-disable @typescript-eslint/no-unused-vars */
-/* eslint-disable no-unused-vars */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
-/* eslint-disable @typescript-eslint/no-unsafe-return */
-/* eslint-disable @typescript-eslint/no-misused-promises */
 import axios from 'axios';
 import { useLoadingBridge } from './LoadingBridge';
 
@@ -27,7 +19,6 @@ class EngineResponseConfig {
   public loading?: EngineLoadingProgress;
 }
 
-/* eslint-disable @typescript-eslint/no-unused-vars */
 export enum SubmitActions {
   restart = 'idefix_restart',
   generateToken = 'idefix_generate_token',
@@ -46,8 +37,54 @@ export interface LoadingBridge {
   stop: () => void;
 }
 
+const TOKEN_MAX_AGE_MS = 100 * 1000;
+const CLOCK_SKEW_TOLERANCE_MS = 30 * 1000;
+
+/**
+ * Hex-encoded random identifier. Everything that names a terminal session or
+ * its owner comes from here, so the choice of RNG lives in one place —
+ * `crypto.getRandomValues` works over plain http too, unlike `crypto.subtle`,
+ * and the router UI usually isn't on https.
+ */
+export const randomId = (bytes = 16): string => {
+  const buf = new Uint8Array(bytes);
+  if (globalThis.crypto?.getRandomValues) {
+    globalThis.crypto.getRandomValues(buf);
+  } else {
+    for (let i = 0; i < buf.length; i++) buf[i] = Math.floor(Math.random() * 256);
+  }
+  return Array.from(buf, (b) => b.toString(16).padStart(2, '0')).join('');
+};
+
 class Engine {
   public token: EngineToken | undefined;
+  private tokenRefresh: Promise<EngineToken | undefined> | null = null;
+  private clientId: string | undefined;
+
+  public getClientId(): string {
+    this.clientId ??= randomId();
+    return this.clientId;
+  }
+
+  public isTokenFresh(maxAgeMs: number = TOKEN_MAX_AGE_MS): boolean {
+    const ts = this.token?.ts;
+    if (!this.token?.sig || !ts) return false;
+
+    const ageMs = Date.now() - ts * 1000;
+    return ageMs > -CLOCK_SKEW_TOLERANCE_MS && ageMs < maxAgeMs;
+  }
+
+  public refreshToken(): Promise<EngineToken | undefined> {
+    this.tokenRefresh ??= (async () => {
+      await this.submit(SubmitActions.generateToken, { client_token: this.getClientId() });
+      await this.getServerToken();
+      return this.token;
+    })().finally(() => {
+      this.tokenRefresh = null;
+    });
+    return this.tokenRefresh;
+  }
+
   private splitPayload(payload: string, chunkSize: number): string[] {
     const chunks: string[] = [];
     let index = 0;
@@ -177,14 +214,14 @@ class Engine {
       onDone: bridge.stop
     });
 
-  if (windowReload) {
+    if (windowReload) {
       setTimeout(() => {
         window.location.href = window.location.pathname + '?updated=' + Date.now();
       }, 500);
     }
   }
 
- checkLoadingProgress(opts: { onUpdate: (msg?: string, progress?: number) => void; onDone: () => void }): Promise<void> {
+  checkLoadingProgress(opts: { onUpdate: (msg?: string, progress?: number) => void; onDone: () => void }): Promise<void> {
     return new Promise((resolve) => {
       let seenProgress = false;
       const timer = setInterval(async () => {
@@ -205,9 +242,7 @@ class Engine {
             opts.onDone();
             resolve();
           }
-        } catch {
-          // Network error during update, keep polling
-        }
+        } catch {}
       }, 500);
     });
   }

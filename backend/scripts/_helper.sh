@@ -63,11 +63,13 @@ printlog() {
         ;;
     esac
 
-    logger -t "IDEFIX" -p "${LOG_FACILITY}.${priority}" -- "$msg"
-
+    # Checked before logger, not after: a suppressed DEBUG line must not reach
+    # syslog either, or "debug off" only hides it from the console.
     if [ "$ADDON_DEBUG" = "false" ] && [ "$level" = "DEBUG" ]; then
         return
     fi
+
+    logger -t "IDEFIX" -p "${LOG_FACILITY}.${priority}" -- "$msg"
 
     if [ "$USE_COLOR" -eq 1 ]; then
         printf '%b%s%b\n' "$color" "$msg" "$CRESET"
@@ -121,7 +123,28 @@ log_box() {
 
 get_proc() {
     local proc_name="$1"
-    echo $(/bin/pidof "$proc_name" 2>/dev/null)
+    local pid=$(/bin/pidof "$proc_name" 2>/dev/null)
+
+    # exit status must reflect whether the process exists: `echo` alone always
+    # succeeds, which silently disables every `if ! get_proc ...` guard
+    [ -n "$pid" ] || return 1
+
+    echo "$pid"
+}
+
+# wait for a process to disappear; $2 = timeout in seconds (default 10)
+wait_proc_gone() {
+    local proc_name="$1"
+    local timeout="${2:-10}"
+    local waited=0
+
+    while [ "$waited" -lt "$timeout" ]; do
+        get_proc "$proc_name" >/dev/null 2>&1 || return 0
+        sleep 1
+        waited=$((waited + 1))
+    done
+
+    return 1
 }
 
 get_proc_uptime() {

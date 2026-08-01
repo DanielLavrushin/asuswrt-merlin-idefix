@@ -1,5 +1,20 @@
 # IDEFIX Terminal Changelog
 
+## [1.5.0] - 2026-08-01
+
+> _Important: this release fixes a security issue in how the terminal's signing key was logged — see the SECURITY notes below. Please also clear your browser cache (e.g. **Ctrl+F5**), as the web UI changed substantially._
+
+- FIXED: **Safari disconnected the terminal constantly** ([#11](https://github.com/DanielLavrushin/asuswrt-merlin-idefix/issues/11)). Safari freezes a page into its back/forward cache when you switch tabs or navigate elsewhere in the router UI, and closes the WebSocket with `WebSocket is closed due to suspension.` — leaving a dead terminal behind an unresponsive overlay. Idefix now notices the page coming back and reconnects on its own. Chrome was unaffected because it doesn't cache pages that hold an open WebSocket.
+- ADDED: **Shell sessions survive a disconnect.** Your shell stays alive for 2 minutes after the browser drops off, and reconnecting picks it up where you left it — same shell, same working directory, same variables, with recent output replayed into the terminal. Switching tabs or briefly losing WiFi no longer costs you your session.
+- FIXED: The terminal now reconnects automatically after _any_ dropped connection, retrying with a backoff, instead of only doing so when its token happened to be stale. The manual Reconnect button appears only once automatic retries are exhausted.
+- FIXED: Pasting more than 32 KB into the terminal killed the connection. The limit is now 1 MB.
+- FIXED: Closing a terminal tab now shuts down its shell immediately instead of leaving it running until it times out.
+- SECURITY: The terminal's HMAC signing key was written to the router's system log every time a token was generated — **including with debug logging turned off**, because the log level was only applied to console output, not to the syslog entry. Anyone holding that key can open a root shell on the terminal port without logging into the router UI. If you have ever shared a system log from a router running Idefix — a forum thread, a bug report — treat that key as public. It is replaced automatically the next time the addon starts, which happens on every reboot and on every update, so no manual action is required.
+- SECURITY: `sec.key` and the token file are now created unreadable to other users, rather than written world-readable and tightened afterwards. The token file was previously mode 664.
+- SECURITY: A terminal session can now only be resumed by the browser that opened it; a session identifier is no longer sufficient on its own.
+- SECURITY: Tokens dated in the future are now rejected. Previously a token minted while the router's clock ran ahead of NTP would never expire.
+- SECURITY: The client identifier supplied by the browser is now validated before it is signed and written into `token.json`.
+
 ## [1.4.5] - 2026-04-13
 
 - FIXED: Installation broken on firmware 3006+ by ASD (Asuswrt Signature Detection) quarantining `/jffs/scripts/idefix` to `/jffs/.asdbk`. The addon script is now placed at `/jffs/addons/idefix/idefix.sh`, which ASD does not scan. Hook entries in `/jffs/scripts/post-mount` and `/jffs/scripts/service-event` are rewritten to point at the new location, and the legacy `/jffs/scripts/idefix` file plus any stale `#idefix` hook lines are cleaned up automatically on upgrade.

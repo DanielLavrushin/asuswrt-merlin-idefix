@@ -1,6 +1,6 @@
 // Version.tsx
-import { Box, Chip, Dialog, DialogTitle, DialogContent, DialogActions, Button, Typography, useTheme } from '@mui/material';
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { Box, Chip, Dialog, DialogTitle, DialogContent, DialogActions, Button, Typography } from '@mui/material';
+import { useEffect, useState, useCallback } from 'react';
 import axios from 'axios';
 import vClean from 'version-clean';
 import vCompare from 'version-compare';
@@ -16,7 +16,6 @@ export default function VersionBadge() {
   const [latest, setLatest] = useState<string | null>(null);
   const [changelog, setChangelog] = useState<string>('');
   const [open, setOpen] = useState(false);
-  const theme = useTheme();
 
   const hasUpdate = latest !== null && vCompare(latest, current) === 1;
 

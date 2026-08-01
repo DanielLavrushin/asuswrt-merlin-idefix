@@ -9,6 +9,7 @@
     "skipLibCheck": true,
     "esModuleInterop": true,
     "moduleResolution": "bundler",
+    "customConditions": ["browser"],
     "resolveJsonModule": true,
     "experimentalDecorators": true,
     "isolatedModules": true,

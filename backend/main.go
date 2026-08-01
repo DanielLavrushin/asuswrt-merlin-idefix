@@ -1,4 +1,3 @@
-// idefix.go
 package main
 
 import (
@@ -9,6 +8,7 @@ import (
 	"crypto/tls"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -42,6 +42,13 @@ func loadCert() (tls.Certificate, error) {
 	}
 	return tls.Certificate{}, fmt.Errorf("no certs found")
 }
+
+const maxMessageBytes = 1 << 20
+
+const (
+	tokenTTL     = 2 * time.Minute
+	maxClockSkew = 30 * time.Second
+)
 
 var (
 	port   int
@@ -95,13 +102,14 @@ func main() {
 
 func wsHandler(w http.ResponseWriter, r *http.Request) {
 
-	if !authorised(r) {
+	owner, ok := authorised(r)
+	if !ok {
 		log.Printf("unauthorised from %s – c=%q  t=%q", r.RemoteAddr, r.URL.Query().Get("c"), r.URL.Query().Get("t"))
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
 
-	log.Printf("authorised client %s (c=%s)", r.RemoteAddr, r.URL.Query().Get("c"))
+	log.Printf("authorised client %s (c=%s)", r.RemoteAddr, owner)
 
 	c, err := websocket.Accept(w, r, &websocket.AcceptOptions{
 		Subprotocols:       []string{"idefix"},
@@ -113,43 +121,60 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	c.SetReadLimit(maxMessageBytes)
+
 	log.Printf("WS connected (%s)", r.RemoteAddr)
 
-	defer c.Close(websocket.StatusNormalClosure, "")
+	serveSession(r.Context(), c, r.URL.Query().Get("sid"), owner, r.RemoteAddr)
+}
 
-	ptmx, proc, err := startShell(80, 24)
-	fmt.Printf("Connected to shell from %s\n", r.RemoteAddr)
+func serveSession(ctx context.Context, c *websocket.Conn, sid, owner, remote string) {
+	if !validSessionID(sid) {
+		if sid != "" {
+			log.Printf("ignoring malformed session id from %s", remote)
+		}
+		sid = newSessionID()
+	}
+
+	sess, resumed, err := acquireSession(sid, owner, 80, 24)
 	if err != nil {
-		log.Printf("shell start error: %v", err)
-		c.Close(websocket.StatusInternalError, err.Error())
+		log.Printf("session error for %s: %v", remote, err)
+		if errors.Is(err, errNotOwner) {
+			c.Close(websocket.StatusPolicyViolation, "session belongs to another client")
+		} else {
+			c.Close(websocket.StatusInternalError, err.Error())
+		}
 		return
 	}
 
-	log.Printf("shell pid=%d for %s", proc.Process.Pid, r.RemoteAddr)
+	if resumed {
+		log.Printf("re-attached to session %s (pid=%d) from %s", sid, sess.proc.Process.Pid, remote)
+	} else {
+		log.Printf("new session %s (pid=%d) for %s", sid, sess.proc.Process.Pid, remote)
+	}
+
+	if err := sess.attach(c); err != nil {
+		log.Printf("attach to session %s failed: %v", sid, err)
+		c.Close(websocket.StatusInternalError, "attach failed")
+		return
+	}
 
 	defer func() {
-		proc.Process.Kill()
-		ptmx.Close()
-		log.Printf("shell pid=%d closed (%s)", proc.Process.Pid, r.RemoteAddr)
+		sess.detach(c)
+		c.Close(websocket.StatusNormalClosure, "")
 	}()
 
-	go func() {
-		_, _ = io.Copy(wsWriter{c}, ptmx)
-	}()
-
-	go func() {
-		proc.Wait()
-		c.Close(websocket.StatusNormalClosure, "shell exited")
-	}()
-
-	ctx := r.Context()
 	for {
 		msgType, rdr, err := c.Reader(ctx)
 		if err != nil {
-			log.Printf("WS read error (%s): %v", r.RemoteAddr, err)
-			break
+			log.Printf("WS read error (%s, session %s): %v", remote, sid, err)
+			return
 		}
-		data, _ := io.ReadAll(rdr)
+		data, err := io.ReadAll(rdr)
+		if err != nil {
+			log.Printf("WS payload error (%s, session %s): %v", remote, sid, err)
+			return
+		}
 
 		if msgType == websocket.MessageText && len(data) > 0 && data[0] == '{' {
 			var ctrl struct {
@@ -157,18 +182,26 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 				Cols int    `json:"cols"`
 				Rows int    `json:"rows"`
 			}
-			if json.Unmarshal(data, &ctrl) == nil && ctrl.Type == "resize" {
-				resizePTY(ptmx, ctrl.Cols, ctrl.Rows)
-				continue
+			if json.Unmarshal(data, &ctrl) == nil {
+				switch ctrl.Type {
+				case "resize":
+					if ctrl.Cols > 0 && ctrl.Rows > 0 {
+						resizePTY(sess.ptmx, ctrl.Cols, ctrl.Rows)
+					}
+					continue
+				case "bye":
+					sess.shutdown("client closed session")
+					return
+				}
 			}
 		}
 
-		_, _ = ptmx.Write(data)
+		_, _ = sess.ptmx.Write(data)
 	}
 }
 
 func startShell(cols, rows int) (ptmx *os.File, cmd *exec.Cmd, err error) {
-	cmd = exec.Command("/bin/sh") // BusyBox ash on Merlin
+	cmd = exec.Command("/bin/sh")
 	log.Printf("Starting shell: %s", cmd.String())
 	winsz := &pty.Winsize{Cols: uint16(cols), Rows: uint16(rows)}
 	ptmx, err = pty.StartWithSize(cmd, winsz)
@@ -179,23 +212,29 @@ func resizePTY(f *os.File, cols, rows int) {
 	pty.Setsize(f, &pty.Winsize{Cols: uint16(cols), Rows: uint16(rows)})
 }
 
-func authorised(r *http.Request) bool {
+func authorised(r *http.Request) (string, bool) {
 	q := r.URL.Query()
 	c := q.Get("c")
 	s := q.Get("s")
 	t := q.Get("t")
 
 	if c == "" || s == "" || t == "" {
-		return false
+		return "", false
 	}
 
 	ts, err := strconv.ParseInt(t, 10, 64)
 	if err != nil {
-		return false
+		return "", false
 	}
-	if time.Since(time.Unix(ts, 0)) > 2*time.Minute {
-		fmt.Println("token expired")
-		return false
+
+	age := time.Since(time.Unix(ts, 0))
+	if age > tokenTTL {
+		log.Printf("token expired (%s old)", age.Truncate(time.Second))
+		return "", false
+	}
+	if age < -maxClockSkew {
+		log.Printf("token rejected: timestamp %s in the future", (-age).Truncate(time.Second))
+		return "", false
 	}
 
 	mac := hmac.New(sha256.New, secret)
@@ -206,17 +245,11 @@ func authorised(r *http.Request) bool {
 
 	sent, err := hex.DecodeString(s)
 	if err != nil {
-		return false
+		return "", false
 	}
 	if !hmac.Equal(expected, sent) {
-		fmt.Println("bad signature")
-		return false
+		log.Printf("bad signature from %s", r.RemoteAddr)
+		return "", false
 	}
-	return true
-}
-
-type wsWriter struct{ *websocket.Conn }
-
-func (w wsWriter) Write(p []byte) (int, error) {
-	return len(p), w.Conn.Write(context.Background(), websocket.MessageBinary, p)
+	return c, true
 }

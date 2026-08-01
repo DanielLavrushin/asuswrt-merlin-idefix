@@ -94,6 +94,12 @@ install() {
     update_loading_progress "Setting up the firewall..."
     firewall_add_rules
 
+    # update() stops the server before swapping the binary and nothing else
+    # brings it back, so the install has to start it itself - otherwise the
+    # port stays open with nothing listening until the next reboot
+    update_loading_progress "Starting $ADDON_TITLE..."
+    start || log_error "$ADDON_TITLE installed but failed to start."
+
     update_loading_progress "Installation completed successfully." false 100
 
     log_box "$ADDON_TITLE $ADDON_VERSION installed successfully."
