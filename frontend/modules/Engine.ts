@@ -46,8 +46,45 @@ export interface LoadingBridge {
   stop: () => void;
 }
 
+// The server rejects tokens older than 2 minutes; refresh a bit before that.
+const TOKEN_MAX_AGE_MS = 100 * 1000;
+
 class Engine {
   public token: EngineToken | undefined;
+  private tokenRefresh: Promise<EngineToken | undefined> | null = null;
+
+  public isTokenFresh(maxAgeMs: number = TOKEN_MAX_AGE_MS): boolean {
+    const ts = this.token?.ts;
+    return !!this.token?.sig && !!ts && Date.now() - ts * 1000 < maxAgeMs;
+  }
+
+  /**
+   * Mints a fresh signed token. Every terminal tab shares `engine.token`, so
+   * concurrent callers are folded into a single round trip — `submit` writes to
+   * the shared `window.idefix.custom_settings`, which must not interleave.
+   */
+  public refreshToken(): Promise<EngineToken | undefined> {
+    if (!this.tokenRefresh) {
+      this.tokenRefresh = (async () => {
+        await this.submit(SubmitActions.generateToken, { client_token: this.generateClientToken() });
+        await this.getServerToken();
+        return this.token;
+      })().finally(() => {
+        this.tokenRefresh = null;
+      });
+    }
+    return this.tokenRefresh;
+  }
+
+  public generateClientToken(): string {
+    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let token = '';
+    for (let i = 0; i < 16; i++) {
+      token += characters.charAt(Math.floor(Math.random() * characters.length));
+    }
+    return token;
+  }
+
   private splitPayload(payload: string, chunkSize: number): string[] {
     const chunks: string[] = [];
     let index = 0;

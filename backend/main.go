@@ -43,6 +43,10 @@ func loadCert() (tls.Certificate, error) {
 	return tls.Certificate{}, fmt.Errorf("no certs found")
 }
 
+// maxMessageBytes caps a single inbound frame; generous enough that pasting a
+// script into the terminal doesn't tear the connection down.
+const maxMessageBytes = 1 << 20
+
 var (
 	port   int
 	secret []byte
@@ -113,43 +117,63 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Default is 32 KiB, which turns a large paste into a fatal read error.
+	c.SetReadLimit(maxMessageBytes)
+
 	log.Printf("WS connected (%s)", r.RemoteAddr)
 
-	defer c.Close(websocket.StatusNormalClosure, "")
+	serveSession(r.Context(), c, r.URL.Query().Get("sid"), r.RemoteAddr)
+}
 
-	ptmx, proc, err := startShell(80, 24)
-	fmt.Printf("Connected to shell from %s\n", r.RemoteAddr)
+// serveSession attaches c to its shell — resuming an existing one when the
+// client brings back a known session id — and pumps browser input into the pty
+// until the socket drops.
+func serveSession(ctx context.Context, c *websocket.Conn, sid, remote string) {
+	if !validSessionID(sid) {
+		if sid != "" {
+			log.Printf("ignoring malformed session id from %s", remote)
+		}
+		sid = newSessionID()
+	}
+
+	sess, resumed, err := acquireSession(sid, 80, 24)
 	if err != nil {
-		log.Printf("shell start error: %v", err)
+		log.Printf("session error for %s: %v", remote, err)
 		c.Close(websocket.StatusInternalError, err.Error())
 		return
 	}
 
-	log.Printf("shell pid=%d for %s", proc.Process.Pid, r.RemoteAddr)
+	if resumed {
+		log.Printf("re-attached to session %s (pid=%d) from %s", sid, sess.proc.Process.Pid, remote)
+	} else {
+		log.Printf("new session %s (pid=%d) for %s", sid, sess.proc.Process.Pid, remote)
+	}
+
+	if err := sess.attach(c); err != nil {
+		log.Printf("attach to session %s failed: %v", sid, err)
+		c.Close(websocket.StatusInternalError, "attach failed")
+		return
+	}
 
 	defer func() {
-		proc.Process.Kill()
-		ptmx.Close()
-		log.Printf("shell pid=%d closed (%s)", proc.Process.Pid, r.RemoteAddr)
+		sess.detach(c)
+		c.Close(websocket.StatusNormalClosure, "")
 	}()
 
-	go func() {
-		_, _ = io.Copy(wsWriter{c}, ptmx)
-	}()
-
-	go func() {
-		proc.Wait()
-		c.Close(websocket.StatusNormalClosure, "shell exited")
-	}()
-
-	ctx := r.Context()
 	for {
 		msgType, rdr, err := c.Reader(ctx)
 		if err != nil {
-			log.Printf("WS read error (%s): %v", r.RemoteAddr, err)
-			break
+			// A Safari back/forward-cache suspension shows up here as a normal
+			// going-away close; the shell stays alive for sessionGrace so the
+			// client can pick it up again.
+			log.Printf("WS read error (%s, session %s): %v", remote, sid, err)
+			return
 		}
-		data, _ := io.ReadAll(rdr)
+		data, err := io.ReadAll(rdr)
+		if err != nil {
+			log.Printf("WS payload error (%s, session %s): %v", remote, sid, err)
+			return
+		}
 
 		if msgType == websocket.MessageText && len(data) > 0 && data[0] == '{' {
 			var ctrl struct {
@@ -157,13 +181,23 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 				Cols int    `json:"cols"`
 				Rows int    `json:"rows"`
 			}
-			if json.Unmarshal(data, &ctrl) == nil && ctrl.Type == "resize" {
-				resizePTY(ptmx, ctrl.Cols, ctrl.Rows)
-				continue
+			if json.Unmarshal(data, &ctrl) == nil {
+				switch ctrl.Type {
+				case "resize":
+					if ctrl.Cols > 0 && ctrl.Rows > 0 {
+						resizePTY(sess.ptmx, ctrl.Cols, ctrl.Rows)
+					}
+					continue
+				case "bye":
+					// Tab closed on purpose — don't leave the shell waiting out
+					// the grace period.
+					sess.shutdown("client closed session")
+					return
+				}
 			}
 		}
 
-		_, _ = ptmx.Write(data)
+		_, _ = sess.ptmx.Write(data)
 	}
 }
 
@@ -213,10 +247,4 @@ func authorised(r *http.Request) bool {
 		return false
 	}
 	return true
-}
-
-type wsWriter struct{ *websocket.Conn }
-
-func (w wsWriter) Write(p []byte) (int, error) {
-	return len(p), w.Conn.Write(context.Background(), websocket.MessageBinary, p)
 }
