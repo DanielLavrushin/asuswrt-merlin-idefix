@@ -63,13 +63,26 @@ check "token.json symlinked" "$([ -L "$ADDON_WEB_DIR/token.json" ] && echo yes)"
 cl=$(jq -r '.cl' <"$ADDON_TOKEN_FILE")
 sig=$(jq -r '.sig' <"$ADDON_TOKEN_FILE")
 ts=$(jq -r '.ts' <"$ADDON_TOKEN_FILE")
+n=$(jq -r '.n' <"$ADDON_TOKEN_FILE")
 check "token json is valid and carries the client id" "$cl" "AbCdEf0123456789"
+check "token carries a 32 hex char nonce" "$(printf '%s' "$n" | wc -c | tr -d ' ')" "32"
 
-# Signature must match what the Go server recomputes: HMAC-SHA256(cl|ts).
+# Signature must match what the Go server recomputes: HMAC-SHA256(cl|ts|n).
 secret=$(cat "$ADDON_SECRET_FILE")
-expect=$(printf '%s|%d' "$cl" "$ts" |
+expect=$(printf '%s|%d|%s' "$cl" "$ts" "$n" |
     openssl dgst -sha256 -mac HMAC -macopt "hexkey:$secret" -hex | awk '{print $2}')
-check "signature matches HMAC(cl|ts)" "$sig" "$expect"
+check "signature matches HMAC(cl|ts|n)" "$sig" "$expect"
+
+# Two tokens minted in the same second must still differ.
+first=$(jq -r '.n' <"$ADDON_TOKEN_FILE")
+generate_token x >/dev/null 2>&1
+second=$(jq -r '.n' <"$ADDON_TOKEN_FILE")
+if [ "$first" = "$second" ]; then
+    printf 'FAIL nonce repeated across two mints: %s\n' "$first"
+    fail=1
+else
+    printf 'ok   each mint gets a fresh nonce\n'
+fi
 
 # --- the leak ----------------------------------------------------------------
 check "secret never reaches syslog" "$(grep -c "$secret" "$SYSLOG")" "0"

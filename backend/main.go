@@ -20,6 +20,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	_ "time/tzdata"
 
@@ -48,8 +49,9 @@ func loadCert() (tls.Certificate, error) {
 const maxMessageBytes = 1 << 20
 
 const (
-	tokenTTL     = 2 * time.Minute
-	maxClockSkew = 30 * time.Second
+	tokenTTL       = 2 * time.Minute
+	maxClockSkew   = 30 * time.Second
+	minSecretBytes = 32
 )
 
 var (
@@ -74,7 +76,13 @@ func main() {
 	if err != nil {
 		panic("missing " + sec_path + " file")
 	}
-	secret, _ = hex.DecodeString(string(bytes.TrimSpace(raw)))
+	secret, err = hex.DecodeString(string(bytes.TrimSpace(raw)))
+	if err != nil {
+		log.Fatalf("%s is not valid hex: %v", sec_path, err)
+	}
+	if len(secret) < minSecretBytes {
+		log.Fatalf("%s holds %d bytes of key material, need at least %d", sec_path, len(secret), minSecretBytes)
+	}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/ws", wsHandler)
@@ -141,7 +149,7 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 
 	owner, ok := authorised(r)
 	if !ok {
-		log.Printf("unauthorised from %s – c=%q  t=%q", r.RemoteAddr, r.URL.Query().Get("c"), r.URL.Query().Get("t"))
+		log.Printf("unauthorised from %s", r.RemoteAddr)
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
@@ -249,13 +257,53 @@ func resizePTY(f *os.File, cols, rows int) {
 	pty.Setsize(f, &pty.Winsize{Cols: uint16(cols), Rows: uint16(rows)})
 }
 
-func authorised(r *http.Request) (string, bool) {
-	q := r.URL.Query()
-	c := q.Get("c")
-	s := q.Get("s")
-	t := q.Get("t")
+const authProtoPrefix = "idefix.auth."
 
-	if c == "" || s == "" || t == "" {
+func credentials(r *http.Request) (client, ts, nonce, sig string) {
+	for _, header := range r.Header.Values("Sec-WebSocket-Protocol") {
+		for _, offer := range strings.Split(header, ",") {
+			offer = strings.TrimSpace(offer)
+			if !strings.HasPrefix(offer, authProtoPrefix) {
+				continue
+			}
+			parts := strings.Split(strings.TrimPrefix(offer, authProtoPrefix), ".")
+			if len(parts) != 4 {
+				return "", "", "", ""
+			}
+			return parts[0], parts[1], parts[2], parts[3]
+		}
+	}
+	return "", "", "", ""
+}
+
+type tokenStore struct {
+	mu   sync.Mutex
+	used map[string]time.Time
+}
+
+var spentTokens = &tokenStore{used: make(map[string]time.Time)}
+
+func (s *tokenStore) consume(sig string, now time.Time) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for seen, at := range s.used {
+		if now.Sub(at) > tokenTTL+maxClockSkew {
+			delete(s.used, seen)
+		}
+	}
+
+	if _, spent := s.used[sig]; spent {
+		return false
+	}
+	s.used[sig] = now
+	return true
+}
+
+func authorised(r *http.Request) (string, bool) {
+	c, t, n, s := credentials(r)
+
+	if c == "" || s == "" || t == "" || n == "" {
 		return "", false
 	}
 
@@ -278,6 +326,8 @@ func authorised(r *http.Request) (string, bool) {
 	mac.Write([]byte(c))
 	mac.Write([]byte("|"))
 	mac.Write([]byte(t))
+	mac.Write([]byte("|"))
+	mac.Write([]byte(n))
 	expected := mac.Sum(nil)
 
 	sent, err := hex.DecodeString(s)
@@ -286,6 +336,10 @@ func authorised(r *http.Request) (string, bool) {
 	}
 	if !hmac.Equal(expected, sent) {
 		log.Printf("bad signature from %s", r.RemoteAddr)
+		return "", false
+	}
+	if !spentTokens.consume(s, time.Now()) {
+		log.Printf("token replayed from %s", r.RemoteAddr)
 		return "", false
 	}
 	return c, true

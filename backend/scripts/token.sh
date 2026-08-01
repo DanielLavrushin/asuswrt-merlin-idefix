@@ -35,8 +35,22 @@ generate_token() {
     local secret
     secret=$(cat "$ADDON_SECRET_FILE")
 
+    local nonce
+    if command -v openssl >/dev/null 2>&1; then
+        nonce=$(openssl rand -hex 16)
+    else
+        nonce=$(hexdump -v -n 16 -e '1/1 "%02x"' /dev/urandom)
+    fi
+
+    case "$nonce" in
+    '' | *[!a-f0-9]*)
+        log_error "Failed to generate a token nonce."
+        return 1
+        ;;
+    esac
+
     local sig
-    sig=$(printf '%s|%d' "$client_token" "$now" |
+    sig=$(printf '%s|%d|%s' "$client_token" "$now" "$nonce" |
         openssl dgst -sha256 -mac HMAC -macopt "hexkey:$secret" -hex |
         awk '{print $2}')
 
@@ -53,7 +67,7 @@ generate_token() {
     local old_umask
     old_umask=$(umask)
     umask 077
-    echo -n "{\"cl\":\"$client_token\", \"ts\":$now, \"sig\":\"$sig\"}" >"$ADDON_TOKEN_FILE"
+    echo -n "{\"cl\":\"$client_token\", \"ts\":$now, \"n\":\"$nonce\", \"sig\":\"$sig\"}" >"$ADDON_TOKEN_FILE"
     umask "$old_umask"
     chmod 600 "$ADDON_TOKEN_FILE"
 

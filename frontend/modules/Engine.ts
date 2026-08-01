@@ -29,6 +29,7 @@ export interface EngineToken {
   sig?: string;
   ts?: number;
   cl?: string;
+  n?: string;
 }
 
 export interface LoadingBridge {
@@ -36,9 +37,6 @@ export interface LoadingBridge {
   update: (msg?: string, progress?: number) => void;
   stop: () => void;
 }
-
-const TOKEN_MAX_AGE_MS = 100 * 1000;
-const CLOCK_SKEW_TOLERANCE_MS = 30 * 1000;
 
 /**
  * Hex-encoded random identifier. Everything that names a terminal session or
@@ -58,7 +56,7 @@ export const randomId = (bytes = 16): string => {
 
 class Engine {
   public token: EngineToken | undefined;
-  private tokenRefresh: Promise<EngineToken | undefined> | null = null;
+  private tokenRefresh: Promise<void> = Promise.resolve();
   private clientId: string | undefined;
 
   public getClientId(): string {
@@ -66,23 +64,17 @@ class Engine {
     return this.clientId;
   }
 
-  public isTokenFresh(maxAgeMs: number = TOKEN_MAX_AGE_MS): boolean {
-    const ts = this.token?.ts;
-    if (!this.token?.sig || !ts) return false;
-
-    const ageMs = Date.now() - ts * 1000;
-    return ageMs > -CLOCK_SKEW_TOLERANCE_MS && ageMs < maxAgeMs;
-  }
-
   public refreshToken(): Promise<EngineToken | undefined> {
-    this.tokenRefresh ??= (async () => {
+    const minted = this.tokenRefresh.then(async () => {
       await this.submit(SubmitActions.generateToken, { client_token: this.getClientId() });
-      await this.getServerToken();
-      return this.token;
-    })().finally(() => {
-      this.tokenRefresh = null;
+      return this.getServerToken();
     });
-    return this.tokenRefresh;
+
+    this.tokenRefresh = minted.then(
+      () => undefined,
+      () => undefined
+    );
+    return minted;
   }
 
   private splitPayload(payload: string, chunkSize: number): string[] {

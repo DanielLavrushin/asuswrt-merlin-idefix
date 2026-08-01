@@ -183,13 +183,10 @@ export const IdefixTerminal = forwardRef<TerminalHandle, TerminalProps>(({ onSta
           if (disposedRef.current) return;
         }
 
-        if (!engine.isTokenFresh()) {
-          await engine.refreshToken();
-          if (disposedRef.current) return;
-        }
+        const token = await engine.refreshToken();
+        if (disposedRef.current) return;
 
-        const token = engine.token;
-        if (!token?.sig) {
+        if (!token?.sig || !token.cl || !token.ts || !token.n) {
           scheduleReconnect();
           return;
         }
@@ -197,12 +194,10 @@ export const IdefixTerminal = forwardRef<TerminalHandle, TerminalProps>(({ onSta
         retireSocketRef.current?.();
 
         const url = new URL(buildEndpoint(window.location.protocol === 'https:'), window.location.href);
-        url.searchParams.set('c', token.cl || '');
-        url.searchParams.set('t', token.ts?.toFixed() || '');
-        url.searchParams.set('s', token.sig);
         url.searchParams.set('sid', sessionIdRef.current);
 
-        const socket = new WebSocket(url, protocol);
+        const credential = `${protocol}.auth.${token.cl}.${token.ts.toFixed()}.${token.n}.${token.sig}`;
+        const socket = new WebSocket(url, [protocol, credential]);
         socket.binaryType = 'arraybuffer';
 
         let retired = false;
