@@ -1,9 +1,11 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net"
 	"os"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -133,6 +135,35 @@ func (idx ifaceIndex) allows(ip net.IP, patterns []string) (allowed, known bool)
 	return true, true
 }
 
+// inventory renders what the guard can see, as "addr[iface ok|refused]". Logged
+// once at startup: when a client is refused, the first question is always what
+// the router reported, and that cannot be reconstructed after the fact.
+func (idx ifaceIndex) inventory(patterns []string) string {
+	if len(idx) == 0 {
+		return "(no interfaces visible)"
+	}
+
+	keys := make([]string, 0, len(idx))
+	for k := range idx {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	var b strings.Builder
+	for _, k := range keys {
+		names := idx[k]
+		verdict := "ok"
+		for _, n := range names {
+			if !ifaceAllowed(n, patterns) {
+				verdict = "refused"
+				break
+			}
+		}
+		fmt.Fprintf(&b, " %s[%s %s]", k, strings.Join(names, ","), verdict)
+	}
+	return strings.TrimSpace(b.String())
+}
+
 // lanGuard decides, per connection, whether the interface it arrived on is one
 // the terminal may serve.
 type lanGuard struct {
@@ -141,6 +172,7 @@ type lanGuard struct {
 	mu      sync.Mutex
 	idx     ifaceIndex
 	fetched time.Time
+	warned  map[string]bool
 	build   func() (ifaceIndex, error)
 }
 
@@ -198,12 +230,43 @@ func (g *lanGuard) permits(local net.Addr) bool {
 	}
 
 	// A tunnel that came up since the cache was built looks unknown. Rebuild
-	// once before refusing.
+	// once before deciding.
 	if idx, err = g.index(true); err != nil {
 		return privateAddr(ip)
 	}
-	allowed, _ = idx.allows(ip, g.patterns)
-	return allowed
+	if allowed, known = idx.allows(ip, g.patterns); known {
+		return allowed
+	}
+
+	// The address is on no interface we can see. That means our picture of the
+	// router is incomplete, not that the address is suspicious — refusing here
+	// takes the terminal down for LAN clients, which is what happened on
+	// firmware where the LAN bridge does not enumerate. Fall back to the
+	// address test: a WAN address is publicly routable and still refused.
+	g.warnUnplaceable(ip)
+	return privateAddr(ip)
+}
+
+// warnUnplaceable reports an address we could not attribute to an interface,
+// once per address, so a misread of the router shows up in the system log
+// instead of silently widening what the guard accepts.
+func (g *lanGuard) warnUnplaceable(ip net.IP) {
+	key := ip.String()
+
+	g.mu.Lock()
+	defer g.mu.Unlock()
+
+	if g.warned == nil {
+		g.warned = make(map[string]bool)
+	}
+	// Bounded: an attacker must not be able to grow this by connecting.
+	if g.warned[key] || len(g.warned) >= 32 {
+		return
+	}
+	g.warned[key] = true
+
+	log.Printf("local address %s belongs to no interface we can see; "+
+		"falling back to allowing private addresses only", key)
 }
 
 // guardedListener drops refused connections inside Accept, so they never reach

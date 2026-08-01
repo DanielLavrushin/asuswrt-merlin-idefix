@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"net"
 	"testing"
 )
@@ -68,15 +69,57 @@ func TestGuardHandlesIPv4MappedAddresses(t *testing.T) {
 	}
 }
 
-// Anything that cannot be placed on a known interface is refused, not allowed.
-func TestGuardRefusesUnknownAddresses(t *testing.T) {
+// An address on no interface we can see means our picture of the router is
+// incomplete. Refusing outright takes the terminal down for LAN clients on
+// firmware whose bridge does not enumerate, so the decision falls back to the
+// address itself — which still refuses anything publicly routable.
+func TestGuardFallsBackForUnplaceableAddresses(t *testing.T) {
 	g := testGuard(routerIndex(), nil, defaultAllowedIfaces)
 
 	if g.permits(&net.TCPAddr{IP: net.ParseIP("198.51.100.5"), Port: 8787}) {
-		t.Error("address on no known interface was permitted")
+		t.Error("unplaceable public address was permitted")
+	}
+	if g.permits(&net.TCPAddr{IP: net.ParseIP("2001:db8:dead::1"), Port: 8787}) {
+		t.Error("unplaceable public IPv6 address was permitted")
+	}
+	if !g.permits(&net.TCPAddr{IP: net.ParseIP("192.168.50.1"), Port: 8787}) {
+		t.Error("unplaceable private address was refused, which strands LAN clients")
 	}
 	if g.permits(&net.TCPAddr{IP: nil, Port: 8787}) {
 		t.Error("nil address was permitted")
+	}
+}
+
+// The exact shape seen on the router: the LAN bridge is missing from the index
+// entirely, so every LAN client was being turned away.
+func TestGuardServesLANWhenBridgeDoesNotEnumerate(t *testing.T) {
+	// Only the loopback enumerated; br0 and its 192.168.1.1 never appeared.
+	g := testGuard(ifaceIndex{"127.0.0.1": {"lo"}}, nil, defaultAllowedIfaces)
+
+	if !g.permits(&net.TCPAddr{IP: net.ParseIP("192.168.1.1"), Port: 8787}) {
+		t.Error("LAN address refused because the bridge did not enumerate")
+	}
+	if g.permits(&net.TCPAddr{IP: net.ParseIP("203.0.113.7"), Port: 8787}) {
+		t.Error("WAN address permitted once enumeration was incomplete")
+	}
+}
+
+func TestGuardWarnsOncePerUnplaceableAddress(t *testing.T) {
+	g := testGuard(ifaceIndex{"127.0.0.1": {"lo"}}, nil, defaultAllowedIfaces)
+
+	for i := 0; i < 5; i++ {
+		g.permits(&net.TCPAddr{IP: net.ParseIP("192.168.1.1"), Port: 8787})
+	}
+	if len(g.warned) != 1 {
+		t.Errorf("warned about %d addresses, want 1", len(g.warned))
+	}
+
+	// Bounded, so connections cannot grow it without limit.
+	for i := 0; i < 100; i++ {
+		g.permits(&net.TCPAddr{IP: net.ParseIP(fmt.Sprintf("10.0.%d.1", i)), Port: 8787})
+	}
+	if len(g.warned) > 32 {
+		t.Errorf("warned map grew to %d entries, want it capped at 32", len(g.warned))
 	}
 }
 

@@ -86,6 +86,11 @@ func main() {
 	// arrived on a WAN address is closed before cmux or TLS ever sees it.
 	guard := newLANGuard()
 	log.Printf("serving only on interfaces: %v", guard.patterns)
+	if idx, err := guard.index(true); err != nil {
+		log.Printf("cannot enumerate interfaces (%v); allowing private addresses only", err)
+	} else {
+		log.Printf("local addresses: %s", idx.inventory(guard.patterns))
+	}
 
 	m := cmux.New(&guardedListener{Listener: ln, guard: guard})
 
