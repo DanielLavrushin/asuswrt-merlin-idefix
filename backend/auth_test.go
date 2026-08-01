@@ -115,6 +115,25 @@ func TestAuthorised(t *testing.T) {
 		}
 	})
 
+	// hex.DecodeString accepts either case, so a spent token re-cased is still
+	// a valid signature and must not read as a fresh one.
+	t.Run("a replayed token re-cased is rejected", func(t *testing.T) {
+		const nonce = "1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c"
+		first := signedRequestNonce(t, "client-case", now.Unix(), nonce)
+		if _, ok := authorised(first); !ok {
+			t.Fatal("expected the first use of a token to be accepted")
+		}
+
+		c, ts, n, sig := credentials(signedRequestNonce(t, "client-case", now.Unix(), nonce))
+		replay := httptest.NewRequest(http.MethodGet, "/ws", nil)
+		replay.Header.Set("Sec-WebSocket-Protocol",
+			fmt.Sprintf("idefix, idefix.auth.%s.%s.%s.%s", c, ts, n, strings.ToUpper(sig)))
+
+		if _, ok := authorised(replay); ok {
+			t.Fatal("expected an upper-cased replay of a spent token to be rejected")
+		}
+	})
+
 	t.Run("a credential missing its nonce is rejected", func(t *testing.T) {
 		r := httptest.NewRequest(http.MethodGet, "/ws", nil)
 		r.Header.Set("Sec-WebSocket-Protocol", "idefix, idefix.auth.client-a.123.deadbeef")
