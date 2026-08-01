@@ -43,6 +43,7 @@ export const IdefixTerminal = forwardRef<TerminalHandle, TerminalProps>(({ onSta
   const connectingRef = useRef(false);
   const disposedRef = useRef(false);
   const connectRef = useRef<(restartServer?: boolean) => Promise<void>>(() => Promise.resolve());
+  const lastSizeRef = useRef({ cols: 0, rows: 0 });
 
   const [phase, setPhase] = useState<Phase>('connecting');
   const [wide, setWide] = useState(false);
@@ -112,6 +113,9 @@ export const IdefixTerminal = forwardRef<TerminalHandle, TerminalProps>(({ onSta
     if (host.clientWidth === 0 || host.clientHeight === 0) return;
 
     fit.fit();
+    if (term.cols === lastSizeRef.current.cols && term.rows === lastSizeRef.current.rows) return;
+    lastSizeRef.current = { cols: term.cols, rows: term.rows };
+
     if (sock && sock.readyState === WebSocket.OPEN) {
       const msg = JSON.stringify({
         type: 'resize',
@@ -121,6 +125,10 @@ export const IdefixTerminal = forwardRef<TerminalHandle, TerminalProps>(({ onSta
       sock.send(msg);
     }
   };
+
+  useEffect(() => {
+    fitAndResize();
+  }, [wide]);
 
   useEffect(() => {
     const node = terminalRef.current;
@@ -213,6 +221,7 @@ export const IdefixTerminal = forwardRef<TerminalHandle, TerminalProps>(({ onSta
           attemptRef.current = 0;
           termRef.current?.reset();
           goPhase('connected');
+          lastSizeRef.current = { cols: 0, rows: 0 };
           fitAndResize();
         });
 

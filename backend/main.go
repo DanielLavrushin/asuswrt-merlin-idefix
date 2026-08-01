@@ -338,7 +338,7 @@ func authorised(r *http.Request) (string, bool) {
 		log.Printf("bad signature from %s", r.RemoteAddr)
 		return "", false
 	}
-	if !spentTokens.consume(s, time.Now()) {
+	if !spentTokens.consume(hex.EncodeToString(sent), time.Now()) {
 		log.Printf("token replayed from %s", r.RemoteAddr)
 		return "", false
 	}

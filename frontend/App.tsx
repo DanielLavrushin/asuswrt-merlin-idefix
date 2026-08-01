@@ -20,10 +20,10 @@ function App() {
     const measure = () => {
       const shell = shellRef.current;
       if (!shell) return;
-      const top = shell.getBoundingClientRect().top + window.scrollY;
+      const shellTopWithinDocument = shell.getBoundingClientRect().top + window.scrollY;
       const footer = footerRef.current?.offsetHeight ?? 0;
       const pageFooter = document.getElementById('footer')?.offsetHeight ?? 0;
-      const available = window.innerHeight - top - footer - pageFooter - SHELL_BOTTOM_GAP;
+      const available = window.innerHeight - shellTopWithinDocument - footer - pageFooter - SHELL_BOTTOM_GAP;
       setShellHeight(Math.max(MIN_SHELL_HEIGHT, Math.round(available)));
     };
 
