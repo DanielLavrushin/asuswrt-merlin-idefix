@@ -33,6 +33,9 @@ restart)
 startup)
     startup
     ;;
+firewall)
+    firewall
+    ;;
 install)
     install
     ;;

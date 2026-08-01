@@ -8,11 +8,12 @@ clear_script_entries() {
     sed -i '/#idefix/d' /jffs/scripts/nat-start >/dev/null 2>&1 || log_debug "Failed to remove entry from /jffs/scripts/nat-start."
     sed -i '/#idefix/d' /jffs/scripts/post-mount >/dev/null 2>&1 || log_debug "Failed to remove entry from /jffs/scripts/post-mount."
     sed -i '/#idefix/d' /jffs/scripts/service-event >/dev/null 2>&1 || log_debug "Failed to remove entry from /jffs/scripts/service-event."
+    sed -i '/#idefix/d' /jffs/scripts/firewall-start >/dev/null 2>&1 || log_debug "Failed to remove entry from /jffs/scripts/firewall-start."
     sed -i '/#idefix/d' /jffs/scripts/dnsmasq.postconf >/dev/null 2>&1 || log_debug "Failed to remove entry from /jffs/scripts/dnsmasq.postconf."
     sed -i '/#idefix/d' /jffs/scripts/wan-start >/dev/null 2>&1 || log_debug "Failed to remove entry from /jffs/scripts/wan-start."
 }
 
-check_jffs_ready() {
+check_jffs_ready() { 
 
     if [ "$(nvram get jffs2_on 2>/dev/null)" != "1" ]; then
         log_error "JFFS partition is DISABLED (nvram jffs2_on=0)."
@@ -69,6 +70,8 @@ install() {
     rm -f "/jffs/scripts/$ADDON_TAG" 2>/dev/null
 
     setup_script_file "/jffs/scripts/post-mount" "$ADDON_SCRIPT startup & #idefix"
+    # Runs on every firewall rebuild, which is what otherwise wipes our rules.
+    setup_script_file "/jffs/scripts/firewall-start" "$ADDON_SCRIPT firewall & #idefix"
     setup_script_file "/jffs/scripts/service-event" "echo \"\$2\" | grep -q \"^idefix\" && $ADDON_SCRIPT service_event \$(echo \"\$2\" | cut -d'_' -f2- | tr '_' ' ') & #idefix"
 
     am_settings_set "idefix_version" "$ADDON_VERSION"
