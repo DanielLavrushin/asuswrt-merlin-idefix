@@ -5,11 +5,42 @@ import axios from 'axios';
 import vClean from 'version-clean';
 import vCompare from 'version-compare';
 import { marked } from 'marked';
+import DOMPurify from 'dompurify';
 import engine, { SubmitActions } from './modules/Engine';
 import { useLoadingBridge } from './modules/LoadingBridge';
 
 const COOKIE_NAME = 'idefix_dontupdate';
 const GITHUB_LATEST_API = 'https://api.github.com/repos/daniellavrushin/asuswrt-merlin-idefix/releases/latest';
+
+const HTTP_URL = /^https?:\/\//i;
+
+const SANITIZE_OPTIONS = {
+  ALLOWED_TAGS: [
+    'p', 'br', 'hr', 'span', 'div',
+    'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+    'strong', 'b', 'em', 'i', 'del', 's',
+    'code', 'pre', 'blockquote',
+    'ul', 'ol', 'li',
+    'a', 'img',
+    'table', 'thead', 'tbody', 'tr', 'th', 'td'
+  ],
+  ALLOWED_ATTR: ['href', 'title', 'src', 'alt'],
+  ALLOWED_URI_REGEXP: HTTP_URL,
+  ALLOW_DATA_ATTR: false,
+  ALLOW_ARIA_ATTR: false
+};
+
+DOMPurify.addHook('afterSanitizeAttributes', node => {
+  if (node.hasAttribute('src') && !HTTP_URL.test(node.getAttribute('src') ?? '')) {
+    node.removeAttribute('src');
+  }
+  if (node.tagName === 'A' && node.hasAttribute('href')) {
+    node.setAttribute('target', '_blank');
+    node.setAttribute('rel', 'noopener noreferrer');
+  }
+});
+
+const renderChangelog = (markdown: string) => DOMPurify.sanitize(marked.parse(markdown, { async: false }), SANITIZE_OPTIONS);
 
 export default function VersionBadge() {
   const current = window.idefix?.custom_settings?.idefix_version ?? '0.0.0';
@@ -26,7 +57,7 @@ export default function VersionBadge() {
         const tag = vClean(data.tag_name);
         setLatest(tag);
 
-        setChangelog(await marked.parse(data.body || ''));
+        setChangelog(renderChangelog(data.body || ''));
         if (tag && vCompare(tag, current) === 1 && engine.getCookie(COOKIE_NAME) !== tag) {
           setOpen(true);
         }
