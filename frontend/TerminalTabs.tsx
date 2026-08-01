@@ -173,7 +173,7 @@ export default function TerminalTabs() {
       </Box>
 
       {/* Terminal panels */}
-      <Box sx={{ flex: 1, position: 'relative', bgcolor: '#1e1e1e' }}>
+      <Box sx={{ flex: 1, minHeight: 0, position: 'relative', bgcolor: '#1e1e1e' }}>
         {tabs.map((t) => {
           const isActive = activeId === t.id;
           return (
