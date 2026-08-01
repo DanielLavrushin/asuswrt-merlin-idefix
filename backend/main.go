@@ -60,8 +60,11 @@ func main() {
 	flag.IntVar(&port, "port", 8787, "listen port")
 	flag.Parse()
 
-	initTZ()
+	// Logging first, so that a timezone we cannot resolve is reported to the
+	// system log rather than to a stderr nobody reads. Every message is
+	// stamped when it is written, so the ones after this still come out right.
 	setupLogging()
+	initTZ()
 
 	const sec_path = "/jffs/addons/idefix/sec.key"
 
@@ -79,7 +82,17 @@ func main() {
 		log.Fatalf("listen: %v", err)
 	}
 
-	m := cmux.New(ln)
+	// Second line of defence behind scripts/firewall.sh: a connection that
+	// arrived on a WAN address is closed before cmux or TLS ever sees it.
+	guard := newLANGuard()
+	log.Printf("serving only on interfaces: %v", guard.patterns)
+	if idx, err := guard.index(true); err != nil {
+		log.Printf("cannot enumerate interfaces (%v); allowing private addresses only", err)
+	} else {
+		log.Printf("local addresses: %s", idx.inventory(guard.patterns))
+	}
+
+	m := cmux.New(&guardedListener{Listener: ln, guard: guard})
 
 	tlsCfg, err := loadCert()
 	if err != nil {
