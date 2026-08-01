@@ -95,6 +95,18 @@ V4_OK=1
 V6_OK=1
 V6_INSERT_OK=1
 
+# The real resolver looks for /usr/sbin/iptables, which exists on the machine
+# running these tests; point it at the stubs instead.
+firewall_resolve_bin() {
+    case "$1" in
+    iptables) [ "$V4_FOUND" = 1 ] && printf 'iptables' ;;
+    ip6tables) [ "$V6_FOUND" = 1 ] && printf 'ip6tables' ;;
+    esac
+    return 0
+}
+V4_FOUND=1
+V6_FOUND=1
+
 iptables() {
     [ "$V4_OK" = 1 ] || return 1
     _ipt "$V4" "$@"
@@ -254,7 +266,22 @@ V6_INSERT_OK=1
 reset_store
 V4_OK=0
 firewall_add_rules >/dev/null 2>&1
-check "missing iptables is a hard failure" "$?" "1"
+check "an unusable iptables is a hard failure" "$?" "1"
 V4_OK=1
+
+reset_store
+V4_FOUND=0
+firewall_add_rules >/dev/null 2>&1
+check "an iptables that cannot be found at all is a hard failure" "$?" "1"
+V4_FOUND=1
+
+# --- ip6tables missing from the filesystem, not merely unusable --------------
+
+reset_store
+V6_FOUND=0
+firewall_add_rules >/dev/null 2>&1
+check "a router with no ip6tables at all still starts" "$?" "0"
+check "the IPv4 rules are applied without ip6tables" "$(count "$V4" '^-p tcp --dport 8787 -j DROP$')" "1"
+V6_FOUND=1
 
 exit "$fail"

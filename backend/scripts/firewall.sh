@@ -81,7 +81,7 @@ firewall_flush_table() {
     local ipt="$1"
     local port="$2"
 
-    command -v "$ipt" >/dev/null 2>&1 || return 0
+    [ -n "$ipt" ] || return 0
 
     local nums n
     # Highest number first, so each delete leaves the remaining numbers valid.
@@ -97,6 +97,24 @@ firewall_flush_table() {
     done
 }
 
+# The addon's PATH puts Entware (/opt/sbin) ahead of the firmware directories,
+# so a bare `iptables` can resolve to an Entware build compiled against another
+# kernel, which cannot drive the firmware's netfilter. Always prefer the
+# firmware binary — it is the one the router's own rules are written with.
+firewall_resolve_bin() {
+    local name="$1"
+    local p
+
+    for p in "/usr/sbin/$name" "/sbin/$name" "/usr/bin/$name" "/bin/$name"; do
+        if [ -x "$p" ]; then
+            printf '%s' "$p"
+            return 0
+        fi
+    done
+
+    command -v "$name" 2>/dev/null || true
+}
+
 # 0 = usable, 2 = not available on this router. The binary being present says
 # nothing: ip6tables ships on firmware with IPv6 turned off, where opening the
 # filter table fails outright. That has to be told apart from a rule we failed
@@ -104,9 +122,17 @@ firewall_flush_table() {
 firewall_table_usable() {
     local ipt="$1"
 
-    command -v "$ipt" >/dev/null 2>&1 || return 2
-    "$ipt" -L INPUT -n >/dev/null 2>&1 || return 2
-    return 0
+    [ -n "$ipt" ] || return 2
+
+    # Keep the reason: this decision can stop the addon from starting, and
+    # "unavailable" with no explanation is not something a user can act on.
+    local err
+    if err="$("$ipt" -L INPUT -n 2>&1 >/dev/null)"; then
+        return 0
+    fi
+
+    log_warn "$ipt cannot be used: ${err:-unknown error}"
+    return 2
 }
 
 firewall_apply_table() {
@@ -143,16 +169,19 @@ firewall_add_rules() {
     log_info "Adding firewall rules for $ADDON_TITLE..."
 
     local port="$ADDON_SERVER_PORT"
+    local ipt ip6t
+    ipt="$(firewall_resolve_bin iptables)"
+    ip6t="$(firewall_resolve_bin ip6tables)"
 
     # Clear first: rules are rebuilt from scratch every time, so the block
     # cannot end up duplicated or half-ordered after a restart or an upgrade.
     firewall_clear_rules
 
-    firewall_apply_table iptables "$port"
+    firewall_apply_table "$ipt" "$port"
     case "$?" in
     0) ;;
     2)
-        log_error "iptables is unavailable; cannot restrict port $port."
+        log_error "iptables is unavailable (${ipt:-not found}); cannot restrict port $port."
         return 1
         ;;
     *)
@@ -164,7 +193,7 @@ firewall_add_rules() {
 
     # The server listens dual-stack, so an IPv6-enabled router would answer on
     # the WAN over IPv6 with the IPv4 rules alone.
-    firewall_apply_table ip6tables "$port"
+    firewall_apply_table "$ip6t" "$port"
     case "$?" in
     0) ;;
     2)
@@ -188,8 +217,8 @@ firewall_clear_rules() {
 
     local port="$ADDON_SERVER_PORT"
 
-    firewall_flush_table iptables "$port"
-    firewall_flush_table ip6tables "$port"
+    firewall_flush_table "$(firewall_resolve_bin iptables)" "$port"
+    firewall_flush_table "$(firewall_resolve_bin ip6tables)" "$port"
 
     return 0
 }
