@@ -160,9 +160,11 @@ firewall_apply_table() {
     local ifn
 
     for ifn in $(firewall_wan_ifaces); do
-        if "$ipt" -I INPUT "$pos" -i "$ifn" -p tcp --dport "$port" -j DROP 2>/dev/null; then
-            pos=$((pos + 1))
+        if ! "$ipt" -I INPUT "$pos" -i "$ifn" -p tcp --dport "$port" -j DROP 2>/dev/null; then
+            log_error "Failed to install the WAN DROP for port $port on $ifn ($ipt)."
+            return 1
         fi
+        pos=$((pos + 1))
     done
 
     for ifn in $(firewall_allowed_ifaces); do

@@ -107,8 +107,17 @@ firewall_resolve_bin() {
 V4_FOUND=1
 V6_FOUND=1
 
+# IPT_FAIL_MATCH makes a single rule refuse to install, to check which failures
+# are fatal and which are tolerated.
+IPT_FAIL_MATCH=""
+
 iptables() {
     [ "$V4_OK" = 1 ] || return 1
+    if [ -n "$IPT_FAIL_MATCH" ]; then
+        case "$*" in
+        *"$IPT_FAIL_MATCH"*) return 1 ;;
+        esac
+    fi
     _ipt "$V4" "$@"
 }
 
@@ -301,6 +310,40 @@ V4_OK=0
 firewall_add_rules >/dev/null 2>&1
 check "an unusable iptables is a hard failure" "$?" "1"
 V4_OK=1
+
+# --- a WAN DROP that will not install ----------------------------------------
+# The explicit WAN DROP sits above the ACCEPTs and is the only thing standing
+# between the Internet and a user who put a WAN interface in
+# IDEFIX_ALLOW_IFACES. Losing it silently must not be possible.
+
+reset_store
+IPT_FAIL_MATCH='-i eth0'
+firewall_add_rules >/dev/null 2>&1
+check "a WAN DROP that fails to install is a hard failure" "$?" "1"
+check "no rules survive a failed WAN DROP" "$(count "$V4" '\-\-dport 8787')" "0"
+IPT_FAIL_MATCH=""
+
+# The same test with a WAN interface deliberately allowed: the failure has to
+# stop the addon rather than leave the ACCEPT standing on its own.
+reset_store
+IDEFIX_ALLOW_IFACES='lo br+ eth0'
+IPT_FAIL_MATCH='-i eth0 -p tcp --dport 8787 -j DROP'
+firewall_add_rules >/dev/null 2>&1
+check "a WAN in the allow list cannot outlive its DROP" "$?" "1"
+check "the WAN ACCEPT is not left behind" "$(count "$V4" '\-i eth0 .* -j ACCEPT')" "0"
+IPT_FAIL_MATCH=""
+unset IDEFIX_ALLOW_IFACES
+
+# A failed ACCEPT only ever removes permission, so it is tolerated on purpose:
+# the port stays shut and the remaining interfaces keep working.
+reset_store
+IPT_FAIL_MATCH='-i tap+'
+firewall_add_rules >/dev/null 2>&1
+check "a failed ACCEPT does not stop the addon" "$?" "0"
+check "the failed ACCEPT is simply absent" "$(count "$V4" '\-i tap+')" "0"
+check "the other interfaces are still accepted" "$(count "$V4" '\-i br+ -p tcp --dport 8787 -j ACCEPT')" "1"
+check "the catch-all DROP is still in place" "$(count "$V4" '^-p tcp --dport 8787 -j DROP$')" "1"
+IPT_FAIL_MATCH=""
 
 reset_store
 V4_FOUND=0
