@@ -71,3 +71,39 @@ func TestAuthorised(t *testing.T) {
 		}
 	})
 }
+
+func TestOriginAllowed(t *testing.T) {
+	cases := []struct {
+		name   string
+		host   string
+		origin string
+		want   bool
+	}{
+		{"no origin at all", "192.168.1.1:8787", "", true},
+		{"router ui on the default port", "192.168.1.1:8787", "http://192.168.1.1", true},
+		{"router ui on the tls port", "192.168.1.1:8787", "https://192.168.1.1:8443", true},
+		{"hostname instead of address", "router.asus.com:8787", "http://router.asus.com", true},
+		{"asus hostname over tls", "www.asusrouter.com:8787", "https://www.asusrouter.com:8443", true},
+		{"ddns name", "myrouter.asuscomm.com:8787", "https://myrouter.asuscomm.com:8443", true},
+		{"hostname case is ignored", "Router.Asus.Com:8787", "http://router.asus.com", true},
+		{"ipv6 literal", "[fd00::1]:8787", "http://[fd00::1]:8443", true},
+		{"host without a port", "192.168.1.1", "http://192.168.1.1", true},
+		{"attacker page", "192.168.1.1:8787", "https://evil.example", false},
+		{"lookalike suffix", "192.168.1.1:8787", "http://192.168.1.1.evil.example", false},
+		{"opaque origin", "192.168.1.1:8787", "null", false},
+		{"origin without a host", "192.168.1.1:8787", "file://", false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			r := httptest.NewRequest(http.MethodGet, "/ws", nil)
+			r.Host = tc.host
+			if tc.origin != "" {
+				r.Header.Set("Origin", tc.origin)
+			}
+			if got := originAllowed(r); got != tc.want {
+				t.Fatalf("originAllowed(host=%q, origin=%q) = %v, want %v", tc.host, tc.origin, got, tc.want)
+			}
+		})
+	}
+}
