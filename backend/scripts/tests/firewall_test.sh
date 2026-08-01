@@ -223,6 +223,28 @@ check "the LAN is still reachable in AP mode" "$(count "$V4" '\-i br+ -p tcp --d
 NV_WAN="eth0"
 NV_WAN0="eth0"
 
+# --- a bare "+" is the iptables match-anything wildcard ----------------------
+# `iptables -i +` is stored as a rule with no interface match at all: the exact
+# unrestricted ACCEPT this file exists to prevent. Verified against real
+# iptables on an RT-BE88U, which accepts it and drops the -i from the rule.
+
+reset_store
+IDEFIX_ALLOW_IFACES='+'
+firewall_add_rules >/dev/null 2>&1
+check "a bare + cannot open the port to every interface" "$(unrestricted_accepts "$V4")" "0"
+check "a bare + is rejected rather than passed to iptables" "$(count "$V4" '\-i + ')" "0"
+check "a bare + falls back to the defaults" "$(count "$V4" '\-i br+ -p tcp --dport 8787 -j ACCEPT')" "1"
+unset IDEFIX_ALLOW_IFACES
+
+# One bad token discards the whole override, so the firewall and the server
+# never end up allowing different sets of interfaces.
+reset_store
+IDEFIX_ALLOW_IFACES='lo + br+'
+firewall_add_rules >/dev/null 2>&1
+check "one bad token discards the whole override" "$(unrestricted_accepts "$V4")" "0"
+check "the discarded override leaves the defaults in place" "$(count "$V4" '\-i wg+ -p tcp --dport 8787 -j ACCEPT')" "1"
+unset IDEFIX_ALLOW_IFACES
+
 # --- a hostile IDEFIX_ALLOW_IFACES -------------------------------------------
 
 reset_store

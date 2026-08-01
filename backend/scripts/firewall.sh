@@ -31,20 +31,26 @@ FIREWALL_DEFAULT_IFACES="lo br+ tun+ tap+ wg+"
 firewall_allowed_ifaces() {
     local ifaces="${IDEFIX_ALLOW_IFACES:-$FIREWALL_DEFAULT_IFACES}"
 
-    # Commas are accepted as separators because the server reads the same
-    # variable and accepts them; a value that works for one layer has to work
-    # for the other, or the port ends up open in one and shut in the other.
     ifaces="$(printf '%s' "$ifaces" | tr ',' ' ')"
+    local valid=1
+    local tok
 
-    # A malformed override must not widen the ruleset or inject arguments into
-    # iptables; fall back to the safe default instead. Checked after the commas
-    # are folded away, so the charset test still sees the final value.
-    case "$(printf '%s' "$ifaces" | tr -d ' ')" in
-    '' | *[!A-Za-z0-9._+-]*)
+    for tok in $ifaces; do
+        case "$tok" in
+        '+' | *[!A-Za-z0-9._+-]*)
+            valid=0
+            break
+            ;;
+        esac
+    done
+
+    # An empty or all-whitespace value leaves the loop with nothing to reject.
+    [ -n "$(printf '%s' "$ifaces" | tr -d ' ')" ] || valid=0
+
+    if [ "$valid" -ne 1 ]; then
         log_warn "Ignoring malformed IDEFIX_ALLOW_IFACES, using defaults."
         ifaces="$FIREWALL_DEFAULT_IFACES"
-        ;;
-    esac
+    fi
 
     printf '%s' "$ifaces"
 }

@@ -13,7 +13,6 @@ func testGuard(idx ifaceIndex, err error, patterns []string) *lanGuard {
 	return g
 }
 
-// A router with a LAN bridge, a guest bridge, an OpenVPN server, and a WAN.
 func routerIndex() ifaceIndex {
 	return ifaceIndex{
 		"127.0.0.1":     {"lo"},
@@ -22,10 +21,10 @@ func routerIndex() ifaceIndex {
 		"192.168.101.1": {"br1"},
 		"10.8.0.1":      {"tun21"},
 		"10.6.0.1":      {"wgs1"},
-		"203.0.113.7":   {"eth0"}, // WAN, public
-		"100.64.3.9":    {"ppp0"}, // WAN behind carrier NAT
+		"203.0.113.7":   {"eth0"},
+		"100.64.3.9":    {"ppp0"},
 		"fd00::1":       {"br0"},
-		"2001:db8::1":   {"eth0"}, // WAN, routable IPv6
+		"2001:db8::1":   {"eth0"},
 	}
 }
 
@@ -44,9 +43,9 @@ func TestGuardRefusesWANAddresses(t *testing.T) {
 		{"10.6.0.1", true},
 		{"fd00::1", true},
 
-		{"203.0.113.7", false}, // the address the scanners in issue #12 hit
-		{"100.64.3.9", false},  // private-looking, but it is the WAN
-		{"2001:db8::1", false}, // IPv6 WAN, which the v4 rules alone would miss
+		{"203.0.113.7", false},
+		{"100.64.3.9", false},
+		{"2001:db8::1", false},
 	}
 
 	for _, c := range cases {
@@ -57,7 +56,6 @@ func TestGuardRefusesWANAddresses(t *testing.T) {
 	}
 }
 
-// A dual-stack listener reports an IPv4 peer's local address in 4-in-6 form.
 func TestGuardHandlesIPv4MappedAddresses(t *testing.T) {
 	g := testGuard(routerIndex(), nil, defaultAllowedIfaces)
 
@@ -69,10 +67,6 @@ func TestGuardHandlesIPv4MappedAddresses(t *testing.T) {
 	}
 }
 
-// An address on no interface we can see means our picture of the router is
-// incomplete. Refusing outright takes the terminal down for LAN clients on
-// firmware whose bridge does not enumerate, so the decision falls back to the
-// address itself — which still refuses anything publicly routable.
 func TestGuardFallsBackForUnplaceableAddresses(t *testing.T) {
 	g := testGuard(routerIndex(), nil, defaultAllowedIfaces)
 
@@ -90,10 +84,7 @@ func TestGuardFallsBackForUnplaceableAddresses(t *testing.T) {
 	}
 }
 
-// The exact shape seen on the router: the LAN bridge is missing from the index
-// entirely, so every LAN client was being turned away.
 func TestGuardServesLANWhenBridgeDoesNotEnumerate(t *testing.T) {
-	// Only the loopback enumerated; br0 and its 192.168.1.1 never appeared.
 	g := testGuard(ifaceIndex{"127.0.0.1": {"lo"}}, nil, defaultAllowedIfaces)
 
 	if !g.permits(&net.TCPAddr{IP: net.ParseIP("192.168.1.1"), Port: 8787}) {
@@ -114,7 +105,6 @@ func TestGuardWarnsOncePerUnplaceableAddress(t *testing.T) {
 		t.Errorf("warned about %d addresses, want 1", len(g.warned))
 	}
 
-	// Bounded, so connections cannot grow it without limit.
 	for i := 0; i < 100; i++ {
 		g.permits(&net.TCPAddr{IP: net.ParseIP(fmt.Sprintf("10.0.%d.1", i)), Port: 8787})
 	}
@@ -123,8 +113,6 @@ func TestGuardWarnsOncePerUnplaceableAddress(t *testing.T) {
 	}
 }
 
-// A link-local address can sit on several interfaces at once; if any of them is
-// the WAN the connection has to go.
 func TestGuardRefusesAddressSharedWithWAN(t *testing.T) {
 	idx := ifaceIndex{"fe80::1": {"br0", "eth0"}}
 	g := testGuard(idx, nil, defaultAllowedIfaces)
@@ -134,8 +122,6 @@ func TestGuardRefusesAddressSharedWithWAN(t *testing.T) {
 	}
 }
 
-// When interfaces cannot be enumerated at all we still refuse anything
-// publicly routable, rather than either refusing everything or trusting it.
 func TestGuardFallsBackToPrivateAddressesOnly(t *testing.T) {
 	g := testGuard(nil, errors.New("no netlink"), defaultAllowedIfaces)
 
@@ -150,8 +136,6 @@ func TestGuardFallsBackToPrivateAddressesOnly(t *testing.T) {
 	}
 }
 
-// A tunnel that comes up after the cache was built must not be refused
-// forever — one miss triggers a rebuild.
 func TestGuardRefreshesForNewInterfaces(t *testing.T) {
 	g := &lanGuard{patterns: defaultAllowedIfaces}
 	calls := 0
@@ -182,16 +166,12 @@ func TestAllowedIfacePatterns(t *testing.T) {
 		{"", defaultAllowedIfaces},
 		{"   ", defaultAllowedIfaces},
 		{"lo br+ tailscale0", []string{"lo", "br+", "tailscale0"}},
-		// Commas separate too: firewall.sh accepts them, so a value that works
-		// for one layer has to work for the other.
 		{"lo,br+,zt", []string{"lo", "br+", "zt"}},
-		// A bare "+" is the iptables match-anything wildcard and would let the
-		// WAN through; it is dropped, leaving the strict defaults.
 		{"+", defaultAllowedIfaces},
 	}
 
 	for _, c := range cases {
-		got := allowedIfacePatterns(c.env)
+		got, _ := allowedIfacePatterns(c.env)
 		if len(got) != len(c.want) {
 			t.Errorf("allowedIfacePatterns(%q) = %v, want %v", c.env, got, c.want)
 			continue
@@ -200,6 +180,43 @@ func TestAllowedIfacePatterns(t *testing.T) {
 			if got[i] != c.want[i] {
 				t.Errorf("allowedIfacePatterns(%q) = %v, want %v", c.env, got, c.want)
 				break
+			}
+		}
+	}
+}
+
+func TestAllowedIfacePatternsRejectsMatchAnything(t *testing.T) {
+	rejected := []string{
+		"+",
+		"lo + br+",
+		"lo,+,br+",
+		"+ +",
+		"lo br;0",
+		"lo br+ $(evil)",
+		"   ",
+	}
+
+	for _, env := range rejected {
+		got, used := allowedIfacePatterns(env)
+		if used {
+			t.Errorf("allowedIfacePatterns(%q) accepted the override as %v", env, got)
+		}
+		if len(got) != len(defaultAllowedIfaces) {
+			t.Errorf("allowedIfacePatterns(%q) = %v, want the defaults", env, got)
+		}
+	}
+
+	if _, used := allowedIfacePatterns("lo br+ tun+ tap+ wg+"); !used {
+		t.Error("the default interface list was rejected as malformed")
+	}
+}
+
+func TestNoOverrideCanReachTheWAN(t *testing.T) {
+	for _, env := range []string{"+", "lo + br+", "", "lo,br+,tailscale0"} {
+		patterns, _ := allowedIfacePatterns(env)
+		for _, wan := range []string{"eth0", "ppp0", "vlan2", "usb0"} {
+			if ifaceAllowed(wan, patterns) {
+				t.Errorf("IDEFIX_ALLOW_IFACES=%q permitted WAN interface %q via %v", env, wan, patterns)
 			}
 		}
 	}
@@ -226,21 +243,16 @@ func TestIfaceAllowed(t *testing.T) {
 	}
 }
 
-// The guard has to read a pattern exactly as iptables would, or an override
-// can open an interface in one layer and leave it shut in the other. A bare
-// name is an exact match; only a trailing '+' wildcards.
 func TestIfaceAllowedMatchesIptablesGrammar(t *testing.T) {
 	cases := []struct {
 		patterns []string
 		name     string
 		want     bool
 	}{
-		// "eth" is an exact name to iptables, so it must not match eth0 here.
 		{[]string{"lo", "br+", "eth"}, "eth0", false},
 		{[]string{"lo", "br+", "eth"}, "eth", true},
 		{[]string{"eth+"}, "eth0", true},
 
-		// "lo" alone must not pull in a longer name that merely starts with it.
 		{[]string{"lo"}, "lo", true},
 		{[]string{"lo"}, "lodge0", false},
 		{[]string{"lo+"}, "lodge0", true},
@@ -256,8 +268,6 @@ func TestIfaceAllowedMatchesIptablesGrammar(t *testing.T) {
 	}
 }
 
-// The guarded listener has to swallow refused connections rather than surface
-// them as an Accept error, which would take the HTTP server down with it.
 func TestGuardedListenerSkipsRefusedConnections(t *testing.T) {
 	wan := &net.TCPAddr{IP: net.ParseIP("203.0.113.7"), Port: 8787}
 	lan := &net.TCPAddr{IP: net.ParseIP("192.168.1.1"), Port: 8787}
