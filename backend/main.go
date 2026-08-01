@@ -15,9 +15,11 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"strconv"
+	"strings"
 	"time"
 	_ "time/tzdata"
 
@@ -113,7 +115,29 @@ func main() {
 	log.Fatal(m.Serve())
 }
 
+func originAllowed(r *http.Request) bool {
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		return true
+	}
+	u, err := url.Parse(origin)
+	if err != nil {
+		return false
+	}
+	page := u.Hostname()
+	if page == "" {
+		return false
+	}
+	return strings.EqualFold(page, (&url.URL{Host: r.Host}).Hostname())
+}
+
 func wsHandler(w http.ResponseWriter, r *http.Request) {
+
+	if !originAllowed(r) {
+		log.Printf("rejected cross-origin handshake from %s – origin=%q host=%q", r.RemoteAddr, r.Header.Get("Origin"), r.Host)
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
 
 	owner, ok := authorised(r)
 	if !ok {
