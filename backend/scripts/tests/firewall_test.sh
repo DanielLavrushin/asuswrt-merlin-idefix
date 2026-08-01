@@ -243,6 +243,17 @@ check "a valid override is honoured" "$(count "$V4" '\-i tailscale0 -p tcp --dpo
 check "an override still cannot open the port to everything" "$(unrestricted_accepts "$V4")" "0"
 unset IDEFIX_ALLOW_IFACES
 
+# The server reads the same variable and accepts commas. If only one layer
+# understood them, the port would be open in one and shut in the other.
+reset_store
+IDEFIX_ALLOW_IFACES='lo,br+,tailscale0'
+firewall_add_rules >/dev/null 2>&1
+check "commas separate interfaces, as they do for the server" \
+    "$(count "$V4" '\-i tailscale0 -p tcp --dport 8787 -j ACCEPT')" "1"
+check "a comma-separated override still closes the port by default" \
+    "$(count "$V4" '^-p tcp --dport 8787 -j DROP$')" "1"
+unset IDEFIX_ALLOW_IFACES
+
 # --- IPv6 disabled, which is the firmware default ----------------------------
 
 reset_store

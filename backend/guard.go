@@ -20,16 +20,21 @@ import (
 // loopback, the LAN bridges and the router's own VPN tunnels are acceptable.
 // Source addresses prove nothing here — a packet from the WAN can carry any
 // source it likes.
-var defaultAllowedIfaces = []string{"lo", "br", "tun", "tap", "wg"}
+//
+// Patterns use the iptables grammar: a trailing '+' is a wildcard, anything
+// else is an exact interface name. The firewall rules are written from the same
+// value, and the two must agree — a pattern that does not open an interface in
+// iptables must not open it here either.
+var defaultAllowedIfaces = []string{"lo", "br+", "tun+", "tap+", "wg+"}
 
 // ifaceCacheTTL bounds how long a connection can be judged against a stale
 // picture of the router's interfaces. Tunnels come and go as VPNs connect.
 const ifaceCacheTTL = 15 * time.Second
 
-// allowedIfacePrefixes mirrors IDEFIX_ALLOW_IFACES from firewall.sh so one
-// setting covers both layers. Trailing '+' is the iptables wildcard; here every
-// entry is a prefix anyway, so it is simply stripped.
-func allowedIfacePrefixes(env string) []string {
+// allowedIfacePatterns mirrors IDEFIX_ALLOW_IFACES from firewall.sh so one
+// setting covers both layers. Spaces and commas both separate entries, matching
+// what the shell side accepts.
+func allowedIfacePatterns(env string) []string {
 	env = strings.TrimSpace(env)
 	if env == "" {
 		return defaultAllowedIfaces
@@ -37,8 +42,8 @@ func allowedIfacePrefixes(env string) []string {
 
 	var out []string
 	for _, f := range strings.Fields(strings.ReplaceAll(env, ",", " ")) {
-		f = strings.TrimSuffix(f, "+")
-		if f != "" {
+		// A bare "+" would match every interface, the WAN included.
+		if f != "" && f != "+" {
 			out = append(out, f)
 		}
 	}
@@ -48,9 +53,13 @@ func allowedIfacePrefixes(env string) []string {
 	return out
 }
 
-func ifaceAllowed(name string, prefixes []string) bool {
-	for _, p := range prefixes {
-		if strings.HasPrefix(name, p) {
+func ifaceAllowed(name string, patterns []string) bool {
+	for _, p := range patterns {
+		if prefix, wildcard := strings.CutSuffix(p, "+"); wildcard {
+			if strings.HasPrefix(name, prefix) {
+				return true
+			}
+		} else if name == p {
 			return true
 		}
 	}
@@ -104,7 +113,7 @@ func buildIfaceIndex() (ifaceIndex, error) {
 
 // allows reports whether every interface carrying ip is allowed. An address we
 // cannot place is not allowed: unknown means refused, never permitted.
-func (idx ifaceIndex) allows(ip net.IP, prefixes []string) (allowed, known bool) {
+func (idx ifaceIndex) allows(ip net.IP, patterns []string) (allowed, known bool) {
 	if ip == nil {
 		return false, true
 	}
@@ -117,7 +126,7 @@ func (idx ifaceIndex) allows(ip net.IP, prefixes []string) (allowed, known bool)
 	}
 
 	for _, n := range names {
-		if !ifaceAllowed(n, prefixes) {
+		if !ifaceAllowed(n, patterns) {
 			return false, true
 		}
 	}
@@ -127,7 +136,7 @@ func (idx ifaceIndex) allows(ip net.IP, prefixes []string) (allowed, known bool)
 // lanGuard decides, per connection, whether the interface it arrived on is one
 // the terminal may serve.
 type lanGuard struct {
-	prefixes []string
+	patterns []string
 
 	mu      sync.Mutex
 	idx     ifaceIndex
@@ -137,7 +146,7 @@ type lanGuard struct {
 
 func newLANGuard() *lanGuard {
 	return &lanGuard{
-		prefixes: allowedIfacePrefixes(os.Getenv("IDEFIX_ALLOW_IFACES")),
+		patterns: allowedIfacePatterns(os.Getenv("IDEFIX_ALLOW_IFACES")),
 		build:    buildIfaceIndex,
 	}
 }
@@ -183,7 +192,7 @@ func (g *lanGuard) permits(local net.Addr) bool {
 		return privateAddr(ip)
 	}
 
-	allowed, known := idx.allows(ip, g.prefixes)
+	allowed, known := idx.allows(ip, g.patterns)
 	if known {
 		return allowed
 	}
@@ -193,7 +202,7 @@ func (g *lanGuard) permits(local net.Addr) bool {
 	if idx, err = g.index(true); err != nil {
 		return privateAddr(ip)
 	}
-	allowed, _ = idx.allows(ip, g.prefixes)
+	allowed, _ = idx.allows(ip, g.patterns)
 	return allowed
 }
 

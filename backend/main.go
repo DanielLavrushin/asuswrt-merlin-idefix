@@ -85,7 +85,7 @@ func main() {
 	// Second line of defence behind scripts/firewall.sh: a connection that
 	// arrived on a WAN address is closed before cmux or TLS ever sees it.
 	guard := newLANGuard()
-	log.Printf("serving only on interfaces: %v", guard.prefixes)
+	log.Printf("serving only on interfaces: %v", guard.patterns)
 
 	m := cmux.New(&guardedListener{Listener: ln, guard: guard})
 

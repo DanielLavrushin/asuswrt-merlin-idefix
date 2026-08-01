@@ -6,8 +6,8 @@ import (
 	"testing"
 )
 
-func testGuard(idx ifaceIndex, err error, prefixes []string) *lanGuard {
-	g := &lanGuard{prefixes: prefixes}
+func testGuard(idx ifaceIndex, err error, patterns []string) *lanGuard {
+	g := &lanGuard{patterns: patterns}
 	g.build = func() (ifaceIndex, error) { return idx, err }
 	return g
 }
@@ -110,7 +110,7 @@ func TestGuardFallsBackToPrivateAddressesOnly(t *testing.T) {
 // A tunnel that comes up after the cache was built must not be refused
 // forever — one miss triggers a rebuild.
 func TestGuardRefreshesForNewInterfaces(t *testing.T) {
-	g := &lanGuard{prefixes: defaultAllowedIfaces}
+	g := &lanGuard{patterns: defaultAllowedIfaces}
 	calls := 0
 	g.build = func() (ifaceIndex, error) {
 		calls++
@@ -131,27 +131,31 @@ func TestGuardRefreshesForNewInterfaces(t *testing.T) {
 	}
 }
 
-func TestAllowedIfacePrefixes(t *testing.T) {
+func TestAllowedIfacePatterns(t *testing.T) {
 	cases := []struct {
 		env  string
 		want []string
 	}{
 		{"", defaultAllowedIfaces},
 		{"   ", defaultAllowedIfaces},
-		{"lo br+ tailscale0", []string{"lo", "br", "tailscale0"}},
-		{"lo,br+,zt", []string{"lo", "br", "zt"}},
+		{"lo br+ tailscale0", []string{"lo", "br+", "tailscale0"}},
+		// Commas separate too: firewall.sh accepts them, so a value that works
+		// for one layer has to work for the other.
+		{"lo,br+,zt", []string{"lo", "br+", "zt"}},
+		// A bare "+" is the iptables match-anything wildcard and would let the
+		// WAN through; it is dropped, leaving the strict defaults.
 		{"+", defaultAllowedIfaces},
 	}
 
 	for _, c := range cases {
-		got := allowedIfacePrefixes(c.env)
+		got := allowedIfacePatterns(c.env)
 		if len(got) != len(c.want) {
-			t.Errorf("allowedIfacePrefixes(%q) = %v, want %v", c.env, got, c.want)
+			t.Errorf("allowedIfacePatterns(%q) = %v, want %v", c.env, got, c.want)
 			continue
 		}
 		for i := range got {
 			if got[i] != c.want[i] {
-				t.Errorf("allowedIfacePrefixes(%q) = %v, want %v", c.env, got, c.want)
+				t.Errorf("allowedIfacePatterns(%q) = %v, want %v", c.env, got, c.want)
 				break
 			}
 		}
@@ -175,6 +179,36 @@ func TestIfaceAllowed(t *testing.T) {
 	for name, want := range cases {
 		if got := ifaceAllowed(name, defaultAllowedIfaces); got != want {
 			t.Errorf("ifaceAllowed(%q) = %v, want %v", name, got, want)
+		}
+	}
+}
+
+// The guard has to read a pattern exactly as iptables would, or an override
+// can open an interface in one layer and leave it shut in the other. A bare
+// name is an exact match; only a trailing '+' wildcards.
+func TestIfaceAllowedMatchesIptablesGrammar(t *testing.T) {
+	cases := []struct {
+		patterns []string
+		name     string
+		want     bool
+	}{
+		// "eth" is an exact name to iptables, so it must not match eth0 here.
+		{[]string{"lo", "br+", "eth"}, "eth0", false},
+		{[]string{"lo", "br+", "eth"}, "eth", true},
+		{[]string{"eth+"}, "eth0", true},
+
+		// "lo" alone must not pull in a longer name that merely starts with it.
+		{[]string{"lo"}, "lo", true},
+		{[]string{"lo"}, "lodge0", false},
+		{[]string{"lo+"}, "lodge0", true},
+
+		{[]string{"tailscale0"}, "tailscale0", true},
+		{[]string{"tailscale0"}, "tailscale1", false},
+	}
+
+	for _, c := range cases {
+		if got := ifaceAllowed(c.name, c.patterns); got != c.want {
+			t.Errorf("ifaceAllowed(%q, %v) = %v, want %v", c.name, c.patterns, got, c.want)
 		}
 	}
 }
