@@ -75,6 +75,12 @@ check "signature matches HMAC(cl|ts)" "$sig" "$expect"
 check "secret never reaches syslog" "$(grep -c "$secret" "$SYSLOG")" "0"
 check "signature never reaches syslog" "$(grep -c "$sig" "$SYSLOG")" "0"
 
+# --- the shape the web UI actually sends (randomId: 32 hex chars) ------------
+PAYLOAD='{"client_token":"9f8e7d6c5b4a39281706f5e4d3c2b1a0"}'
+generate_token x >/dev/null 2>&1
+check "accepts the client id the web UI generates" \
+    "$(jq -r '.cl' <"$ADDON_TOKEN_FILE")" "9f8e7d6c5b4a39281706f5e4d3c2b1a0"
+
 # --- rejected client tokens --------------------------------------------------
 for bad in '"a\"b; rm -rf /"' '"short"' '"has space"' '""' 'null'; do
     PAYLOAD="{\"client_token\":$bad}"
@@ -87,6 +93,7 @@ for bad in '"a\"b; rm -rf /"' '"short"' '"has space"' '""' 'null'; do
 done
 
 # A rejected token must not have overwritten the good one.
-check "good token survived the bad ones" "$(jq -r '.cl' <"$ADDON_TOKEN_FILE")" "AbCdEf0123456789"
+check "good token survived the bad ones" \
+    "$(jq -r '.cl' <"$ADDON_TOKEN_FILE")" "9f8e7d6c5b4a39281706f5e4d3c2b1a0"
 
 exit "$fail"

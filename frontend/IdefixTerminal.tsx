@@ -6,7 +6,7 @@ import { FitAddon } from '@xterm/addon-fit';
 import { AttachAddon } from '@xterm/addon-attach';
 
 import { Backdrop, Box, Button, CircularProgress, IconButton, Stack, Tooltip, Typography } from '@mui/material';
-import engine, { SubmitActions } from './modules/Engine';
+import engine, { randomId, SubmitActions } from './modules/Engine';
 import CloseFullscreenIcon from '@mui/icons-material/CloseFullscreen';
 import OpenInFullIcon from '@mui/icons-material/OpenInFull';
 import SaveAltIcon from '@mui/icons-material/SaveAlt';
@@ -29,16 +29,6 @@ const rows = 0;
 
 const RECONNECT_DELAYS = [250, 500, 1000, 2000, 4000, 8000];
 
-const newSessionId = (): string => {
-  const bytes = new Uint8Array(16);
-  if (globalThis.crypto?.getRandomValues) {
-    globalThis.crypto.getRandomValues(bytes);
-  } else {
-    for (let i = 0; i < bytes.length; i++) bytes[i] = Math.floor(Math.random() * 256);
-  }
-  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
-};
-
 export const IdefixTerminal = forwardRef<TerminalHandle, TerminalProps>(({ onStatusChange = () => {} }, ref) => {
   const terminalRef = useRef<HTMLDivElement | null>(null);
   const termRef = useRef<Terminal | null>(null);
@@ -46,7 +36,7 @@ export const IdefixTerminal = forwardRef<TerminalHandle, TerminalProps>(({ onSta
   const attachAddonRef = useRef<AttachAddon | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
   const sessionIdRef = useRef<string>('');
-  if (!sessionIdRef.current) sessionIdRef.current = newSessionId();
+  if (!sessionIdRef.current) sessionIdRef.current = randomId();
   const retireSocketRef = useRef<(() => void) | null>(null);
   const retryTimerRef = useRef<number | null>(null);
   const attemptRef = useRef(0);

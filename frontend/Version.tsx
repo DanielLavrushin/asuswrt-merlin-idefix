@@ -1,5 +1,5 @@
 // Version.tsx
-import { Box, Chip, Dialog, DialogTitle, DialogContent, DialogActions, Button, Typography, useTheme } from '@mui/material';
+import { Box, Chip, Dialog, DialogTitle, DialogContent, DialogActions, Button, Typography } from '@mui/material';
 import { useEffect, useState, useCallback } from 'react';
 import axios from 'axios';
 import vClean from 'version-clean';

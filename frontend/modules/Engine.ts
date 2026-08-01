@@ -39,13 +39,29 @@ export interface LoadingBridge {
 
 const TOKEN_MAX_AGE_MS = 100 * 1000;
 
+/**
+ * Hex-encoded random identifier. Everything that names a terminal session or
+ * its owner comes from here, so the choice of RNG lives in one place —
+ * `crypto.getRandomValues` works over plain http too, unlike `crypto.subtle`,
+ * and the router UI usually isn't on https.
+ */
+export const randomId = (bytes = 16): string => {
+  const buf = new Uint8Array(bytes);
+  if (globalThis.crypto?.getRandomValues) {
+    globalThis.crypto.getRandomValues(buf);
+  } else {
+    for (let i = 0; i < buf.length; i++) buf[i] = Math.floor(Math.random() * 256);
+  }
+  return Array.from(buf, (b) => b.toString(16).padStart(2, '0')).join('');
+};
+
 class Engine {
   public token: EngineToken | undefined;
   private tokenRefresh: Promise<EngineToken | undefined> | null = null;
   private clientId: string | undefined;
 
   public getClientId(): string {
-    this.clientId ??= this.generateClientToken();
+    this.clientId ??= randomId();
     return this.clientId;
   }
 
@@ -65,15 +81,6 @@ class Engine {
       });
     }
     return this.tokenRefresh;
-  }
-
-  public generateClientToken(): string {
-    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    let token = '';
-    for (let i = 0; i < 16; i++) {
-      token += characters.charAt(Math.floor(Math.random() * characters.length));
-    }
-    return token;
   }
 
   private splitPayload(payload: string, chunkSize: number): string[] {
